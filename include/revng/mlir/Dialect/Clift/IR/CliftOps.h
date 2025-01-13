@@ -72,6 +72,17 @@ void printCliftOpOperandTypes(OpAsmPrinter &Printer,
   clift::impl::printCliftOpTypes(Printer, nullptr, { Arguments... });
 }
 
+ParseResult parseCliftTernaryOpTypes(OpAsmParser &Parser,
+                                     Type &Condition,
+                                     Type &Lhs,
+                                     Type &Rhs);
+
+void printCliftTernaryOpTypes(OpAsmPrinter &Printer,
+                              Operation *Op,
+                              Type Condition,
+                              Type Lhs,
+                              Type Rhs);
+
 } // namespace mlir
 
 // This include should stay here for correct build procedure

@@ -138,6 +138,11 @@ def Clift_FunctionOp : Clift_Op<"func",
 
   let hasCustomAssemblyFormat = 1;
 
+  let builders = [
+    OpBuilder<(ins "llvm::StringRef":$name,
+                   "mlir::Type":$function_type)>
+  ];
+
   code extraClassDeclaration = [{
     mlir::Region::BlockListType& getBlocks() {
         return getBody().getBlocks();
@@ -468,8 +473,8 @@ class Clift_BinaryArithmeticOp<string mnemonic>
 }
 
 class Clift_BinaryLogicalOp<string mnemonic> : Clift_ExpressionOp<mnemonic> {
-  let arguments = (ins Clift_AnyPrimitiveIntegerType:$lhs,
-                       Clift_AnyPrimitiveIntegerType:$rhs);
+  let arguments = (ins Clift_AnyScalarType:$lhs,
+                       Clift_AnyScalarType:$rhs);
 
   let results = (outs Clift_AnyNonConstType<Clift_AnyPrimitiveTypeOf<"SignedKind">>:$result);
 
@@ -745,6 +750,37 @@ def Clift_CallOp : Clift_ExpressionOp<"call"> {
   let results = (outs Clift_AnyNonConstType<Clift_AnyValueType>:$result);
 
   let hasCustomAssemblyFormat = 1;
+  let hasVerifier = 1;
+}
+
+def Clift_TernaryOp
+  : Clift_ExpressionOp<"ternary",
+                       [Clift_AllTypesMatch<["lhs", "rhs"]>,
+                        TypesMatchWith<"result type must match the value type, ignoring qualifiers",
+                                       "lhs",
+                                       "result",
+                                       "mlir::clift::impl::removeCliftConst($_self)">]> {
+
+  let arguments = (ins Clift_AnyScalarType:$condition,
+                       Clift_AnyValueType:$lhs,
+                       Clift_AnyValueType:$rhs);
+
+  let results = (outs Clift_AnyNonConstType<Clift_AnyValueType>:$result);
+
+  let assemblyFormat = [{
+    $condition `,` $lhs `,` $rhs attr-dict `:` `(`
+    custom<CliftTernaryOpTypes>(type($condition), type($lhs), type($rhs)) `)`
+  }];
+}
+
+def Clift_AggregateOp : Clift_ExpressionOp<"aggregate"> {
+  let arguments = (ins Variadic<Clift_AnyValueType>:$initializers);
+  let results = (outs Clift_AnyNonConstType<Clift_AnyValueType>:$result);
+
+  let assemblyFormat = [{
+    $initializers attr-dict `:` `(` type($initializers) `)` `->` type($result)
+  }];
+
   let hasVerifier = 1;
 }
 

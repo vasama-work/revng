@@ -44,12 +44,6 @@ static ValueType getExpressionType(Region &R) {
   return {};
 }
 
-static FunctionTypeAttr getFunctionTypeAttr(mlir::Type Type) {
-  if (auto T = mlir::dyn_cast<DefinedType>(dealias(Type)))
-    return mlir::dyn_cast<FunctionTypeAttr>(T.getElementType());
-  return {};
-}
-
 //===-------------------------- Type constraints --------------------------===//
 
 bool clift::impl::verifyPrimitiveTypeOf(ValueType Type, PrimitiveKind Kind) {
@@ -342,15 +336,20 @@ public:
       if (Region &R = Return.getResult(); not R.empty())
         ReturnType = getExpressionType(R);
 
-      if (ReturnType and isVoid(FunctionReturnType))
+      if (isVoid(FunctionReturnType)) {
+        if (ReturnType)
+          return Op->emitOpError() << Op->getName()
+                                   << " cannot return expression in function"
+                                      " returning void.";
+      } else if (not ReturnType) {
         return Op->emitOpError() << Op->getName()
-                                 << " cannot return expression in function"
+                                 << " must return a value in function not"
                                     " returning void.";
-
-      if (ReturnType != FunctionReturnType)
+      } else if (ReturnType != FunctionReturnType) {
         return Op->emitOpError() << Op->getName()
                                  << " type does not match the function return"
                                     " type";
+      }
     } else if (mlir::isa<SwitchBreakOp>(Op)) {
       if (not hasLoopOrSwitchParent(Op,
                                     LoopOrSwitch::Switch,
@@ -448,6 +447,28 @@ mlir::LogicalResult clift::ModuleOp::verify() {
 
 //===----------------------------- FunctionOp -----------------------------===//
 
+void FunctionOp::build(OpBuilder &Builder,
+                       OperationState &State,
+                       llvm::StringRef Name,
+                       mlir::Type FunctionType) {
+  size_t ArgumentCount = 0;
+  if (auto TypeAttr = clift::getFunctionTypeAttr(FunctionType))
+    ArgumentCount = TypeAttr.getArgumentTypes().size();
+
+  llvm::SmallVector<mlir::Attribute> DictionaryArray;
+  DictionaryArray.resize(std::max<size_t>(ArgumentCount, 1),
+                         mlir::DictionaryAttr::get(Builder.getContext()));
+
+  llvm::ArrayRef Attrs(DictionaryArray);
+  build(Builder,
+        State,
+        Name,
+        FunctionType,
+        mlir::ArrayAttr::get(Builder.getContext(),
+                             Attrs.take_front(ArgumentCount)),
+        mlir::ArrayAttr::get(Builder.getContext(), Attrs.take_front(1)));
+}
+
 mlir::ParseResult FunctionOp::parse(OpAsmParser &Parser,
                                     OperationState &Result) {
   StringAttr SymbolNameAttr;
@@ -466,7 +487,7 @@ mlir::ParseResult FunctionOp::parse(OpAsmParser &Parser,
   if (Parser.parseType(FunctionType).failed())
     return mlir::failure();
 
-  auto FunctionTypeAttr = ::getFunctionTypeAttr(FunctionType);
+  auto FunctionTypeAttr = clift::getFunctionTypeAttr(FunctionType);
   if (not FunctionTypeAttr)
     return Parser.emitError(FunctionTypeLoc) << "expected Clift function or "
                                                 "pointer-to-function type.";
@@ -537,7 +558,7 @@ void FunctionOp::print(OpAsmPrinter &Printer) {
   Printer.printType(getFunctionType());
   Printer << '>';
 
-  auto FunctionTypeAttr = ::getFunctionTypeAttr(getFunctionType());
+  auto FunctionTypeAttr = clift::getFunctionTypeAttr(getFunctionType());
 
   function_interface_impl::printFunctionSignature(Printer,
                                                   *this,
@@ -562,11 +583,11 @@ void FunctionOp::print(OpAsmPrinter &Printer) {
 }
 
 ArrayRef<Type> FunctionOp::getArgumentTypes() {
-  return ::getFunctionTypeAttr(getFunctionType()).getArgumentTypes();
+  return clift::getFunctionTypeAttr(getFunctionType()).getArgumentTypes();
 }
 
 ArrayRef<Type> FunctionOp::getResultTypes() {
-  return ::getFunctionTypeAttr(getFunctionType()).getResultTypes();
+  return clift::getFunctionTypeAttr(getFunctionType()).getResultTypes();
 }
 
 Type FunctionOp::cloneTypeWith(TypeRange inputs, TypeRange results) {
@@ -708,9 +729,11 @@ mlir::LogicalResult MakeLabelOp::verify() {
 //===------------------------------ ReturnOp ------------------------------===//
 
 mlir::LogicalResult ReturnOp::verify() {
-  if (not isReturnableType(getExpressionType(getResult())))
-    return emitOpError() << getOperationName()
-                         << " requires void or non-array object type.";
+  if (mlir::Region &R = getResult(); not R.empty()) {
+    if (not isReturnableType(getExpressionType(R)))
+      return emitOpError() << getOperationName()
+                           << " requires void or non-array object type.";
+  }
 
   return mlir::success();
 }
@@ -1062,13 +1085,6 @@ UseOp::verifySymbolUses(SymbolTableCollection &SymbolTable) {
 
 //===-------------------------------- CallOp ------------------------------===//
 
-static FunctionTypeAttr getFunctionOrFunctionPointerTypeAttr(ValueType Type) {
-  ValueType ValueT = decomposeTypedef(Type).Type;
-  if (auto P = mlir::dyn_cast<PointerType>(ValueT))
-    ValueT = decomposeTypedef(P.getPointeeType()).Type;
-  return getFunctionTypeAttr(ValueT);
-}
-
 mlir::ParseResult CallOp::parse(OpAsmParser &Parser, OperationState &Result) {
   OpAsmParser::UnresolvedOperand FunctionOperand;
   if (Parser.parseOperand(FunctionOperand).failed())
@@ -1208,6 +1224,86 @@ mlir::LogicalResult CallOp::verify() {
     return emitOpError() << getOperationName()
                          << " result type must match the return type of the"
                             " function, ignoring qualifiers.";
+
+  return mlir::success();
+}
+
+//===------------------------------ TernaryOp -----------------------------===//
+
+ParseResult mlir::parseCliftTernaryOpTypes(OpAsmParser &Parser,
+                                           Type &Condition,
+                                           Type &Lhs,
+                                           Type &Rhs) {
+  if (Parser.parseType(Condition).failed())
+    return mlir::failure();
+
+  if (Parser.parseComma().failed())
+    return mlir::failure();
+
+  if (Parser.parseType(Lhs).failed())
+    return mlir::failure();
+
+  if (Parser.parseOptionalComma().succeeded()) {
+    if (Parser.parseType(Rhs).failed())
+      return mlir::failure();
+  } else {
+    Rhs = Lhs;
+  }
+
+  return mlir::success();
+}
+
+void mlir::printCliftTernaryOpTypes(OpAsmPrinter &Printer,
+                                    Operation *Op,
+                                    Type Condition,
+                                    Type Lhs,
+                                    Type Rhs) {
+  Printer << Condition;
+  Printer << ',';
+  Printer << Lhs;
+
+  if (Lhs != Rhs) {
+    Printer << ',';
+    Printer << Rhs;
+  }
+}
+
+//===----------------------------- AggregateOp ----------------------------===//
+
+mlir::LogicalResult AggregateOp::verify() {
+  auto InitializerTypes = getInitializers().getTypes();
+
+  auto AT = dealias(getResult().getType(), true);
+
+  if (auto T = mlir::dyn_cast<StructTypeAttr>(getTypeDefinitionAttr(AT))) {
+    auto Fields = T.getFields();
+
+    if (InitializerTypes.size() != Fields.size())
+      return emitOpError() << getOperationName()
+                           << " must initialize all struct members.";
+
+    for (auto [IT, SF] : llvm::zip(InitializerTypes, Fields)) {
+      if (mlir::cast<clift::ValueType>(IT).removeConst() != SF.getType().removeConst())
+        return emitOpError() << getOperationName()
+                             << " initializer types must match the struct field"
+                                " types.";
+    }
+  } else if (auto T = mlir::dyn_cast<ArrayType>(AT)) {
+    if (InitializerTypes.size() != T.getElementsCount())
+      return emitOpError() << getOperationName()
+                           << " must initialize all array elements.";
+
+    auto ElementType = T.getElementType().removeConst();
+    for (auto IT : InitializerTypes) {
+      if (mlir::cast<clift::ValueType>(IT).removeConst() != ElementType)
+        return emitOpError() << getOperationName()
+                             << " initializer types must match the array"
+                                " element type.";
+    }
+  } else {
+    return emitOpError() << getOperationName()
+                         << " result type must be a struct or array type.";
+  }
 
   return mlir::success();
 }

@@ -130,4 +130,15 @@ bool isCallableType(ValueType Type);
 /// Qualifiers are ignored.
 bool isReturnableType(ValueType Type);
 
+TypeDefinitionAttr getTypeDefinitionAttr(mlir::Type Type);
+
+template<typename AttrT>
+AttrT getTypeDefinitionAttr(mlir::Type Type) {
+  return mlir::dyn_cast<AttrT>(getTypeDefinitionAttr(Type));
+}
+
+FunctionTypeAttr getFunctionTypeAttr(mlir::Type Type);
+
+FunctionTypeAttr getFunctionOrFunctionPointerTypeAttr(mlir::Type Type);
+
 } // namespace mlir::clift

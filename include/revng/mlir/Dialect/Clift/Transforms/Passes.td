@@ -7,6 +7,17 @@
 
 include "mlir/Pass/PassBase.td"
 
+def CliftImportLLVM : Pass<"import-llvm", "mlir::ModuleOp"> {
+  let summary = "";
+  let constructor = "mlir::clift::createImportLLVMPass()";
+  let dependentDialects = ["clift::CliftDialect"];
+
+  let options = [
+    Option<"LLVMIRPath", "llvm", "std::string", /*default*/"\"\"", "LLVM IR Path">,
+    Option<"Model", "model", "mlir::clift::ModelOptionType", /*default=*/"nullptr", "Model path">
+  ];
+}
+
 def CliftVerifyC : Pass<"verify-c", "clift::ModuleOp"> {
   let summary = "Verify that the Clift semantics correspond to C semantics " #
                 "in the specified target implementation.";

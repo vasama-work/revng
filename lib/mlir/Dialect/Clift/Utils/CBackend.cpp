@@ -122,6 +122,7 @@ public:
       return &*It;
     }
 
+    llvm::errs() << "UniqueHandle: " << Op.getUniqueHandle() << "\n";
     revng_abort("Unrecognizable function unique handle.");
   }
 
@@ -464,6 +465,23 @@ public:
     rc_return;
   }
 
+  RecursiveCoroutine<void> emitAggregateExpression(mlir::Value V) {
+    auto E = V.getDefiningOp<AggregateOp>();
+
+    Out << '(';
+    rc_recur emitType(E.getResult().getType());
+    Out << ')';
+
+    Out << '{';
+    for (auto [I, Initializer] : llvm::enumerate(E.getInitializers())) {
+      if (I != 0)
+        Out << ',' << ' ';
+
+      rc_recur emitExpression(Initializer);
+    }
+    Out << '}';
+  }
+
   RecursiveCoroutine<void> emitParameterExpression(mlir::Value V) {
     auto Arg = mlir::cast<mlir::BlockArgument>(V);
     Out << ParameterNames[Arg.getArgNumber()];
@@ -729,6 +747,13 @@ public:
       };
     }
 
+    if (mlir::isa<AggregateOp>(E)) {
+      return {
+        .Precedence = OperatorPrecedence::Primary,
+        .Emit = &CEmitter::emitAggregateExpression,
+      }
+    }
+
     if (mlir::isa<UseOp>(E)) {
       return {
         .Precedence = OperatorPrecedence::Primary,
@@ -982,10 +1007,12 @@ public:
   }
 
   RecursiveCoroutine<void> emitReturnStatement(ReturnOp S) {
-    Out << C.getKeyword(Keyword::Return) << ' ';
+    Out << C.getKeyword(Keyword::Return);
 
-    if (not S.getResult().empty())
+    if (not S.getResult().empty()) {
+      Out << ' ';
       rc_recur emitExpressionRegion(S.getResult());
+    }
 
     Out << ';' << '\n';
   }
