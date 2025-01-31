@@ -19,6 +19,9 @@ template<typename Attribute>
 using AttributeVector = llvm::SmallVector<Attribute, 16>;
 
 class CliftConverter {
+  static constexpr llvm::StringRef ModelNamespace = "/model-type";
+  static constexpr llvm::StringRef RegisterSetNamespace = "/register-set-type";
+
   mlir::MLIRContext *Context;
   model::NameBuilder NameBuilder;
   llvm::function_ref<mlir::InFlightDiagnostic()> EmitError;
@@ -121,13 +124,17 @@ private:
     }
   }
 
-  std::string getUniqueHandle(const model::TypeDefinition &ModelType) {
+  std::string getUniqueHandle(llvm::StringRef Namespace, uint64_t ID) {
     std::string UniqueHandle;
     {
       llvm::raw_string_ostream Out(UniqueHandle);
-      Out << "/model-type/" << ModelType.ID();
+      Out << Namespace << '/' << ID;
     }
     return UniqueHandle;
+  }
+
+  std::string getUniqueHandle(const model::TypeDefinition &ModelType) {
+    return getUniqueHandle(ModelNamespace, ModelType.ID());
   }
 
   RecursiveCoroutine<clift::TypeDefinitionAttr>
@@ -196,18 +203,20 @@ private:
   }
 
   RecursiveCoroutine<clift::ValueType>
-  getScalarTupleType(const model::RawFunctionDefinition &ModelType) {
-    using ElementAttr = clift::ScalarTupleElementAttr;
+  getRegisterSetType(const model::RawFunctionDefinition &ModelType) {
+    using ElementAttr = clift::FieldAttr;
 
     AttributeVector<ElementAttr> Elements;
     Elements.reserve(ModelType.ReturnValues().size());
 
+    uint64_t Offset = 0;
     for (const model::NamedTypedRegister &Register : ModelType.ReturnValues()) {
       const auto RegisterType = rc_recur fromType(*Register.Type());
       if (not RegisterType)
         rc_return nullptr;
 
-      const auto Attribute = make<ElementAttr>(RegisterType,
+      const auto Attribute = make<ElementAttr>(Offset,
+                                               RegisterType,
                                                NameBuilder
                                                  .returnValueName(ModelType,
                                                                   Register));
@@ -215,11 +224,17 @@ private:
         rc_return nullptr;
 
       Elements.push_back(Attribute);
+      Offset += RegisterType.getByteSize();
     }
 
-    rc_return make<clift::ScalarTupleType>(getUniqueHandle(ModelType),
-                                           "",
-                                           Elements);
+    auto
+      Attr = make<clift::StructTypeAttr>(getUniqueHandle(RegisterSetNamespace,
+                                                         ModelType.ID()),
+                                         "",
+                                         Offset,
+                                         Elements);
+
+    rc_return make<clift::DefinedType>(Attr, getBool(false));
   }
 
   RecursiveCoroutine<clift::TypeDefinitionAttr>
@@ -276,13 +291,15 @@ private:
       ReturnType = rc_recur fromType(*ModelType.ReturnValues().begin()->Type());
       break;
 
-    default:
-      ReturnType = make<clift::ScalarTupleType>(getUniqueHandle(ModelType));
-      {
-        const auto R = IncompleteTypes.try_emplace(ModelType.ID(), &ModelType);
-        revng_assert(R.second && "Scalar tuple types are only visited once.");
-      }
-      break;
+    default: {
+      auto
+        Attr = make<clift::StructTypeAttr>(getUniqueHandle(RegisterSetNamespace,
+                                                           ModelType.ID()));
+      ReturnType = make<clift::DefinedType>(Attr, getBool(false));
+
+      const auto R = IncompleteTypes.try_emplace(ModelType.ID(), &ModelType);
+      revng_assert(R.second && "Register set types are only visited once.");
+    } break;
     }
     if (not ReturnType)
       rc_return nullptr;
@@ -500,7 +517,7 @@ private:
       clift::ValueType CompleteType;
       if (const auto
             RFT = llvm::dyn_cast<model::RawFunctionDefinition>(&ModelType)) {
-        CompleteType = getScalarTupleType(*RFT);
+        CompleteType = getRegisterSetType(*RFT);
       } else {
         CompleteType = fromTypeDefinition(ModelType,
                                           /* RequireComplete = */ true);
