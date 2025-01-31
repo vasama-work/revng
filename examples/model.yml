@@ -1,0 +1,40 @@
+#
+# This file is distributed under the MIT License. See LICENSE.md for details.
+#
+
+Architecture: x86_64
+
+TypeDefinitions:
+- ID: 1001
+  Kind: CABIFunctionDefinition
+  ABI: SystemV_x86_64
+  Arguments:
+  - Index: 0
+    Type:
+      Kind: PrimitiveType
+      PrimitiveKind: Unsigned
+      Size: 1
+- ID: 1002
+  Kind: CABIFunctionDefinition
+  ABI: SystemV_x86_64
+  Arguments:
+  - Index: 0
+    Type:
+      Kind: PrimitiveType
+      PrimitiveKind: Unsigned
+      Size: 1
+  - Index: 1
+    Type:
+      Kind: PrimitiveType
+      PrimitiveKind: Unsigned
+      Size: 1
+
+Functions:
+- Entry: "0x40001001:Code_x86_64"
+  Prototype:
+    Kind: DefinedType
+    Definition: "/TypeDefinitions/1001-CABIFunctionDefinition"
+- Entry: "0x40001002:Code_x86_64"
+  Prototype:
+    Kind: DefinedType
+    Definition: "/TypeDefinitions/1002-CABIFunctionDefinition"

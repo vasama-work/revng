@@ -1,0 +1,19 @@
+digraph "CFG for 'f' function" {
+	label="CFG for 'f' function";
+
+	Node0x7efef7f60280 [shape=record,color="#3d50c3ff", style=filled, fillcolor="#cedaeb70",label="{block_a:\l  br i1 %a, label %goto_c, label %block_b\l|{<s0>T|<s1>F}}"];
+	Node0x7efef7f60280:s0 -> Node0x7efef7f60240;
+	Node0x7efef7f60280:s1 -> Node0x7efef7f60200;
+	Node0x7efef7f60240 [shape=record,color="#3d50c3ff", style=filled, fillcolor="#abc8fd70",label="{goto_c:                                           \l  call void @goto-block()\l  call void @scope-closer(ptr blockaddress(@f, %block_b))\l  br label %block_c\l}"];
+	Node0x7efef7f60240 -> Node0x7efef7f60140;
+	Node0x7efef7f60200 [shape=record,color="#b70d28ff", style=filled, fillcolor="#bb1b2c70",label="{block_b:                                          \l  call void @scope-closer(ptr blockaddress(@f, %block_e))\l  br label %block_c\l}"];
+	Node0x7efef7f60200 -> Node0x7efef7f60140;
+	Node0x7efef7f60140 [shape=record,color="#b70d28ff", style=filled, fillcolor="#b70d2870",label="{block_c:                                          \l  br label %block_d\l}"];
+	Node0x7efef7f60140 -> Node0x7efef7f60080;
+	Node0x7efef7f60080 [shape=record,color="#b70d28ff", style=filled, fillcolor="#b70d2870",label="{block_d:                                          \l  br i1 %b, label %goto_b, label %block_e\l|{<s0>T|<s1>F}}"];
+	Node0x7efef7f60080:s0 -> Node0x7efef7f60040;
+	Node0x7efef7f60080:s1 -> Node0x7efef7f60100;
+	Node0x7efef7f60040 [shape=record,color="#b70d28ff", style=filled, fillcolor="#bb1b2c70",label="{goto_b:                                           \l  call void @goto-block()\l  call void @scope-closer(ptr blockaddress(@f, %block_e))\l  br label %block_b\l}"];
+	Node0x7efef7f60040 -> Node0x7efef7f60200;
+	Node0x7efef7f60100 [shape=record,color="#3d50c3ff", style=filled, fillcolor="#cedaeb70",label="{block_e:                                          \l  ret void\l}"];
+}
