@@ -304,7 +304,7 @@ private:
       ParameterTypes.push_back(rc_recur importLLVMType(T));
 
     auto Attr = FunctionTypeAttr::get(Context,
-                                      NextInventedTypeID++,
+                                      "", // WIP: UniqueHandle
                                       "",
                                       ReturnType,
                                       ParameterTypes);
@@ -327,7 +327,7 @@ private:
     }
 
     auto Attr = StructTypeAttr::get(Context,
-                                    NextInventedTypeID++,
+                                    "", // WIP: UniqueHandle
                                     "",
                                     Offset,
                                     Fields);
@@ -1169,8 +1169,6 @@ private:
   mlir::Block *LabelBlock = nullptr;
   unsigned LabelCount = 0;
   unsigned LocalCount = 0;
-
-  uint64_t NextInventedTypeID = 1'000'000'000;
 };
 
 } // namespace

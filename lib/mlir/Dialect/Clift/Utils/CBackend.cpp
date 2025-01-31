@@ -751,7 +751,7 @@ public:
       return {
         .Precedence = OperatorPrecedence::Primary,
         .Emit = &CEmitter::emitAggregateExpression,
-      }
+      };
     }
 
     if (mlir::isa<UseOp>(E)) {
