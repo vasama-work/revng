@@ -1103,10 +1103,12 @@ public:
   }
 
   RecursiveCoroutine<void> emitReturnStatement(ReturnOp S) {
-    Out << C.getKeyword(Keyword::Return) << ' ';
+    Out << C.getKeyword(Keyword::Return);
 
-    if (not S.getResult().empty())
+    if (not S.getResult().empty()) {
+      Out << ' ';
       rc_recur emitExpressionRegion(S.getResult());
+    }
 
     Out << ';' << '\n';
   }
