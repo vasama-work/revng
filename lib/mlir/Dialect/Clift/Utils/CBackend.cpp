@@ -80,6 +80,11 @@ enum class OperatorPrecedence {
   Ternary = Assignment,
 };
 
+// TODO: Add the intrinsic identifiers to the TargetCImplementation.
+static llvm::DenseMap<llvm::StringRef, llvm::StringRef> IntrinsicIdentifiers = {
+  { "/builtin/unreachable", "__builtin_unreachable" },
+};
+
 class CEmitter {
 public:
   explicit CEmitter(const TargetCImplementation &Target,
@@ -615,6 +620,29 @@ public:
     Out << ')';
   }
 
+  RecursiveCoroutine<void> emitIntrinsicExpression(mlir::Value V) {
+    auto E = V.getDefiningOp<IntrinsicOp>();
+
+    auto It = IntrinsicIdentifiers.find(E.getUniqueHandle());
+    if (It == IntrinsicIdentifiers.end())
+      revng_abort("Unrecognized intrinsic");
+    Out << It->second;
+
+    // The precedence here must be comma, because an argument list cannot
+    // contain an unparenthesized comma expression. It would be parsed as two
+    // arguments instead.
+    CurrentPrecedence = OperatorPrecedence::Comma;
+
+    Out << '(';
+    for (auto [I, A] : llvm::enumerate(E.getArguments())) {
+      if (I != 0)
+        Out << ',' << ' ';
+
+      rc_recur emitExpression(A);
+    }
+    Out << ')';
+  }
+
   RecursiveCoroutine<void> emitCastExpression(mlir::Value V) {
     auto E = V.getDefiningOp<CastOp>();
 
@@ -821,6 +849,13 @@ public:
       return {
         .Precedence = OperatorPrecedence::UnaryPostfix,
         .Emit = &CEmitter::emitCallExpression,
+      };
+    }
+
+    if (mlir::isa<IntrinsicOp>(E)) {
+      return {
+        .Precedence = OperatorPrecedence::UnaryPostfix,
+        .Emit = &CEmitter::emitIntrinsicExpression,
       };
     }
 

@@ -829,4 +829,14 @@ def Clift_AggregateOp : Clift_ExpressionOp<"aggregate"> {
   let hasVerifier = 1;
 }
 
+def Clift_IntrinsicOp : Clift_ExpressionOp<"intrinsic"> {
+  let arguments = (ins StrAttr:$unique_handle,
+                       Variadic<Clift_AnyValueType>:$arguments);
+
+  let results = (outs Clift_AnyNonConstType<Clift_AnyValueType>:$result);
+
+  let hasCustomAssemblyFormat = 1;
+  let hasVerifier = 1;
+}
+
 #endif

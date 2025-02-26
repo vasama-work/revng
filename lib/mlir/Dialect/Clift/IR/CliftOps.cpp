@@ -1296,6 +1296,13 @@ static void printArgumentList(OpAsmPrinter &Printer,
   Printer << ')';
 }
 
+static void printArgumentList(OpAsmPrinter &Printer,
+                              mlir::OperandRange Operands) {
+  return printArgumentList(Printer, Operands, [](unsigned) -> clift::ValueType {
+    return {};
+  });
+}
+
 static auto makeCallArgumentTypeAccessor(FunctionTypeAttr Function) {
   return [Function](unsigned I) -> clift::ValueType {
     auto ParameterTypes = Function.getArgumentTypes();
@@ -1529,6 +1536,60 @@ mlir::LogicalResult AggregateOp::verify() {
     return emitOpError() << getOperationName()
                          << " result have struct or array type.";
   }
+
+  return mlir::success();
+}
+
+//===----------------------------- IntrinsicOp ----------------------------===//
+
+mlir::ParseResult IntrinsicOp::parse(OpAsmParser &Parser,
+                                     OperationState &Result) {
+  std::string Identifier;
+  if (Parser.parseString(&Identifier).failed())
+    return mlir::failure();
+
+  ArgumentListParser Arguments;
+  if (Arguments.parse(Parser, /*RequireTypes=*/true).failed())
+    return mlir::failure();
+
+  if (Parser.parseOptionalAttrDict(Result.attributes).failed())
+    return mlir::failure();
+
+  if (Parser.parseColon().failed())
+    return mlir::failure();
+
+  clift::ValueType ResultType;
+  if (Parser.parseType(ResultType).failed())
+    return mlir::failure();
+
+  if (Arguments.resolveOperands(Parser, Result).failed())
+    return mlir::failure();
+
+  Result.addTypes({ ResultType });
+
+  Result.addAttribute("unique_handle",
+                      mlir::StringAttr::get(Parser.getContext(), Identifier));
+
+  return mlir::success();
+}
+
+void IntrinsicOp::print(OpAsmPrinter &Printer) {
+  Printer << " \"";
+  llvm::printEscapedString(getUniqueHandle(), Printer.getStream());
+  Printer << '"';
+
+  printArgumentList(Printer, getArguments());
+  Printer.printOptionalAttrDict(getOperation()->getAttrs(),
+                                { "unique_handle" });
+
+  Printer << " : ";
+  Printer << getResult().getType();
+}
+
+mlir::LogicalResult IntrinsicOp::verify() {
+  if (getUniqueHandle().empty())
+    return emitOpError() << getOperationName()
+                         << " unique handle must be non-empty.";
 
   return mlir::success();
 }
