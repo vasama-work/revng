@@ -5,4 +5,4 @@
 // RUN: not %revngcliftopt %s 2>&1 | FileCheck %s
 
 // CHECK: unique handle must be non-empty
-clift.intrinsic ""() : !clift.primitive<VoidKind 0>
+clift.intrinsic ""() : !clift.primitive<void 0>
