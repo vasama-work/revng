@@ -7,17 +7,24 @@
 
 include "mlir/Pass/PassBase.td"
 
-def CliftVerifyC : Pass<"verify-c", "clift::ModuleOp"> {
-  let summary = "Verify that the Clift semantics correspond to C semantics " #
-                "in the specified target implementation.";
-  let constructor = "mlir::clift::createVerifyCPass()";
+class Clift_Pass<string arg, string operation> : Pass<arg, operation> {
   let dependentDialects = ["clift::CliftDialect"];
 }
 
-def CliftEmitC : Pass<"emit-c", "clift::ModuleOp"> {
+def CliftBeautify : Clift_Pass<"beautify", "clift::FunctionOp"> {
+  let summary = "Beautify Clift";
+  let constructor = "mlir::clift::createBeautifyPass()";
+}
+
+def CliftVerifyC : Clift_Pass<"verify-c", "clift::ModuleOp"> {
+  let summary = "Verify that the Clift semantics correspond to C semantics " #
+                "in the specified target implementation.";
+  let constructor = "mlir::clift::createVerifyCPass()";
+}
+
+def CliftEmitC : Clift_Pass<"emit-c", "clift::ModuleOp"> {
   let summary = "Emit C code (optionally with PTML tags) from the Clift code.";
   let constructor = "mlir::clift::createEmitCPass()";
-  let dependentDialects = ["clift::CliftDialect"];
 
   let options = [
     Option<"Tagless", "tagless", "bool", /*default=*/"false", "Emit without PTML tags">,

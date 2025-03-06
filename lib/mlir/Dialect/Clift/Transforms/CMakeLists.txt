@@ -5,9 +5,11 @@
 add_mlir_dialect_library(
   MLIRCliftTransforms
   SHARED
+  Beautify.cpp
   CBackend.cpp
   CSemantics.cpp
   ModelOption.cpp
+  Rewrites.cpp
   DEPENDS
   LINK_LIBS
   PUBLIC

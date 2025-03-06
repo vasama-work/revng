@@ -1,3 +1,8 @@
+set(LLVM_TARGET_DEFINITIONS Rewrites.td)
+mlir_tablegen(Rewrites.h.inc -gen-rewriters)
+add_public_tablegen_target(MLIRCliftRewriteIncGen)
+add_dependencies(mlir-headers MLIRCliftRewriteIncGen)
+
 set(LLVM_TARGET_DEFINITIONS Passes.td)
 mlir_tablegen(Passes.h.inc -gen-pass-decls -name Clift)
 add_public_tablegen_target(MLIRCliftPassIncGen)
