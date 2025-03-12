@@ -51,9 +51,9 @@ static DivModPair ptrOffsetDivMod(mlir::IntegerAttr OffsetAttr,
 }
 
 namespace {
-#include "revng/mlir/Dialect/Clift/Transforms/Rewrites.h.inc"
+#include "revng/mlir/Dialect/Clift/Transforms/Beautify/Expressions.h.inc"
 } // namespace
 
-void clift::populateRewritePatterns(RewritePatternSet &Patterns) {
+void clift::populateBeautifyExpressionRewritePatterns(RewritePatternSet &Patterns) {
   populateWithGenerated(Patterns);
 }

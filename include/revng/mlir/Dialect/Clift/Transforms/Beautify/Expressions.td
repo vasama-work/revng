@@ -18,13 +18,13 @@ def IsBitcastKind
   : Constraint<CPred<"$0.getValue() == clift::CastKind::Bitcast">>;
 
 
+def getType : NativeCodeCall<"$0.getType()">;
+
 def createImmediateOp
   : NativeCodeCall<"$_builder.create<clift::ImmediateOp>($_loc, $0, $1)">;
 
 def createCastOp
   : NativeCodeCall<"$_builder.create<clift::CastOp>($_loc, $0, $1, $2)">;
-
-def getType : NativeCodeCall<"$0.getType()">;
 
 
 // - -x -> x
@@ -70,7 +70,8 @@ def EnumImmediatePattern
   : Pat<(Clift_CastOp:$res (Clift_ImmediateOp $value), $kind),
         (createImmediateOp (getType $res), $value),
         [(IsBitcastKind $kind),
-         (Constraint<CPred<"hasEnumeratorValue($0.getType(), $1.getValue().getZExtValue())">> $res, $value)]>;
+         (Constraint<CPred<[{ hasEnumeratorValue($0.getType(),
+                                                 $1.getValue().getZExtValue()) }]>> $res, $value)]>;
 
 // *&x -> x
 def IndirectionAddressofPattern

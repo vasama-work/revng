@@ -10,7 +10,8 @@ class RewritePatternSet;
 
 namespace clift {
 
-void populateRewritePatterns(RewritePatternSet &Patterns);
+void populateBeautifyStatementRewritePatterns(RewritePatternSet &Patterns);
+void populateBeautifyExpressionRewritePatterns(RewritePatternSet &Patterns);
 
 } // namespace clift
 } // namespace mlir
