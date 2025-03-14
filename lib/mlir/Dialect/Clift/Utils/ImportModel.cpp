@@ -225,7 +225,7 @@ private:
     std::string TypeName;
     {
       llvm::raw_string_ostream Out(TypeName);
-      Out << "register_set_" << ModelType.ID();
+      Out << "_register_set_" << ModelType.ID();
     }
 
     auto Attr = make<clift::StructTypeAttr>(getRegisterSetLocation(ModelType),

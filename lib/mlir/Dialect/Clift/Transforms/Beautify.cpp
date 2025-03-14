@@ -25,7 +25,7 @@ struct BeautifyPass : clift::impl::CliftBeautifyBase<BeautifyPass> {
     mlir::MLIRContext &Context = getContext();
 
     mlir::RewritePatternSet Patterns(&Context);
-    clift::populateRewritePatterns(Patterns);
+    clift::populateBeautifyExpressionRewritePatterns(Patterns);
 
     if (mlir::applyPatternsAndFoldGreedily(getOperation(),
                                            std::move(Patterns)).failed())
@@ -35,7 +35,7 @@ struct BeautifyPass : clift::impl::CliftBeautifyBase<BeautifyPass> {
 
 } // namespace
 
-std::unique_ptr<mlir::OperationPass<clift::FunctionOp>>
+std::unique_ptr<mlir::OperationPass<clift::ModuleOp>>
 clift::createBeautifyPass() {
   return std::make_unique<BeautifyPass>();
 }

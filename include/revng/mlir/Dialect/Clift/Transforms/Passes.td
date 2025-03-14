@@ -11,7 +11,18 @@ class Clift_Pass<string arg, string operation> : Pass<arg, operation> {
   let dependentDialects = ["clift::CliftDialect"];
 }
 
-def CliftBeautify : Clift_Pass<"beautify", "clift::FunctionOp"> {
+def CliftImportLLVM : Clift_Pass<"import-llvm", "mlir::ModuleOp"> {
+  let summary = "";
+  let constructor = "mlir::clift::createImportLLVMPass()";
+
+  let options = [
+    Option<"LLVMIRPath", "llvm", "std::string", /*default*/"\"\"", "LLVM IR Path">,
+    Option<"Model", "model", "mlir::clift::ModelOptionType", /*default=*/"nullptr", "Model path">
+  ];
+}
+
+//TODO: Use FunctionOp
+def CliftBeautify : Clift_Pass<"beautify", "clift::ModuleOp"> {
   let summary = "Beautify Clift";
   let constructor = "mlir::clift::createBeautifyPass()";
 }

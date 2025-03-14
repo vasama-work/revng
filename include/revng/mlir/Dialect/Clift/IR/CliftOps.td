@@ -102,7 +102,8 @@ def Clift_OptionalExpressionRegion
 //===------------------------ Top level operations ------------------------===//
 
 def Clift_ModuleOp : Clift_Op<"module",
-                              [SymbolTable,
+                              [AffineScope,
+                               SymbolTable,
                                HasOnlyGraphRegion,
                                NoRegionArguments,
                                SingleBlock,

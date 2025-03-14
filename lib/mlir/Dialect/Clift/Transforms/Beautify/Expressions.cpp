@@ -44,6 +44,13 @@ static DivModPair ptrOffsetDivMod(mlir::IntegerAttr OffsetAttr,
   uint64_t Offset = OffsetAttr.getValue().getZExtValue();
   uint64_t Size = PointerType.getPointeeType().getByteSize();
 
+  if (Size == 0) {
+    return {
+      .Div = static_cast<uint64_t>(-1),
+      .Mod = static_cast<uint64_t>(-1),
+    };
+  }
+
   return {
     .Div = Offset / Size,
     .Mod = Offset % Size,

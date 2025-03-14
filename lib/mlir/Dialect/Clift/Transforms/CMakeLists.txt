@@ -9,6 +9,7 @@ add_mlir_dialect_library(
   Beautify.cpp
   CBackend.cpp
   CSemantics.cpp
+  ImportLLVM.cpp
   ModelOption.cpp
   DEPENDS
   LINK_LIBS
