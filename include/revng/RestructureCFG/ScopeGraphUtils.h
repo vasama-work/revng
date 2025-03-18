@@ -58,3 +58,7 @@ void verifyScopeGraphAnnotationsImpl(FunctionTags::Tag &Tag,
                                      const llvm::BasicBlock *BB);
 
 void verifyScopeGraphAnnotations(const llvm::BasicBlock *BB);
+
+/// Helper function which checks that a function does not contain `BasicBlock`s
+/// without predecessors (except the entry `BasicBlock`)
+void verifyNoDisconnectedBlock(const llvm::Function &F);

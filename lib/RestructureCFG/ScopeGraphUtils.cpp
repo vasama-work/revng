@@ -181,3 +181,11 @@ void verifyScopeGraphAnnotations(const BasicBlock *BB) {
   verifyScopeGraphAnnotationsImpl(FunctionTags::ScopeCloserMarker, BB);
   verifyScopeGraphAnnotationsImpl(FunctionTags::GotoBlockMarker, BB);
 }
+
+void verifyNoDisconnectedBlock(const Function &F) {
+  for (auto &BB : F) {
+    if (&BB != &F.getEntryBlock()) {
+      revng_assert(not predecessors(&BB).empty());
+    }
+  }
+}
