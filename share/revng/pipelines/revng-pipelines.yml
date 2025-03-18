@@ -676,6 +676,12 @@ Branches:
               - dce
               - exit-ssa
               - switch-to-statements
+              - dagify
+              - ids
+              - ese
+              - select-scope
+              - ids
+              - ese
         Artifacts:
           Container: module.bc.zstd
           Kind: stack-accesses-segregated
