@@ -21,7 +21,7 @@
 namespace clift = mlir::clift;
 using namespace clift;
 
-//#define enable_printing
+#define enable_printing
 
 #ifdef enable_printing
 #define myprintf(...) fprintf(stderr, __VA_ARGS__)
@@ -1097,16 +1097,17 @@ private:
       auto [Iterator, Inserted] = BlockMapping.try_emplace(BB);
 
       // WIP: Remove this once the scope graph can be relied upon to be decided.
-      if (Iterator->second.InsertPoint.isSet())
-        rc_return;
-
+      //if (Iterator->second.InsertPoint.isSet())
+      //  rc_return;
 
       revng_assert(not Iterator->second.InsertPoint.isSet());
       Iterator->second.InsertPoint = saveInsertionPointAfter(Builder);
 
-      if (not Inserted and Iterator->second.Label)
-        myprintl("assign label 1"), emitAssignLabel(Iterator->second.Label,
-                                                    getLocation(BB));
+      if (not Inserted and Iterator->second.Label) {
+        myprintl("assign label 1");
+        emitAssignLabel(Iterator->second.Label, getLocation(BB));
+        Iterator->second.HasAssignLabel = true;
+      }
     }
 
     const llvm::Instruction *Terminal = BB->getTerminator();
@@ -1214,11 +1215,13 @@ private:
         if (not Iterator->second.Label)
           Iterator->second.Label = emitMakeLabel(getLocation(Succ));
 
-        if (Iterator->second.InsertPoint.isSet()) {
+        if (not Iterator->second.HasAssignLabel
+            and Iterator->second.InsertPoint.isSet()) {
           myprintl("assign label 2");
           mlir::OpBuilder::InsertionGuard Guard(Builder);
           restoreInsertionPointAfter(Builder, Iterator->second.InsertPoint);
           emitAssignLabel(Iterator->second.Label, getLocation(Succ));
+          Iterator->second.HasAssignLabel = true;
         }
 
         Builder.create<GoToOp>(getLocation(Terminal),
@@ -1349,10 +1352,12 @@ private:
     if (MF == nullptr)
       return;
 
-#if 0
+#if 1
     if (F->getName() == "local_0x401185:Code_x86_64")
       return;
-    if (F->getName() != "local_0x403630:Code_x86_64")
+    if (F->getName() == "local_0x401000:Code_x86_64")
+      return;
+    if (F->getName() != "local_0x40385b:Code_x86_64")
       return;
     llvm::errs() << F->getName() << "\n";
 #endif
@@ -1436,6 +1441,9 @@ private:
     // The result value of the MakeLabelOp to be used as the target for gotos
     // jumping into the mapped LLVM IR basic block.
     mlir::Value Label;
+
+    // True if the AssignLabelOp has already been created.
+    bool HasAssignLabel = false;
   };
 
   struct ArgumentMappingInfo {

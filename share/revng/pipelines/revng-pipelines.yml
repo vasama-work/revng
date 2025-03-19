@@ -682,6 +682,7 @@ Branches:
               - select-scope
               - ids
               - ese
+              - remove-constant-array-returns
         Artifacts:
           Container: module.bc.zstd
           Kind: stack-accesses-segregated
