@@ -42,4 +42,17 @@ def Clift_ExpressionOpInterface : Clift_OpInterface<"ExpressionOpInterface"> {
   ];
 }
 
+def Clift_LoopOpInterface : Clift_OpInterface<"LoopOpInterface"> {
+  let methods = [
+    InterfaceMethod<
+      /*desc=*/"",
+      "mlir::Region &", "getLoopBody", (ins),
+      /*methodBody=*/[{}],
+      /*defaultImplementation=*/[{
+        return $_op.getBody();
+      }]
+    >
+  ];
+}
+
 #endif

@@ -5,6 +5,7 @@
 #include "revng/ABI/FunctionType/Layout.h"
 #include "revng/ADT/RecursiveCoroutine.h"
 #include "revng/ADT/ScopedExchange.h"
+#include "revng/LocalVariables/LocalVariableHelpers.h"
 #include "revng/RestructureCFG/ScopeGraphGraphTraits.h"
 #include "revng/mlir/Dialect/Clift/IR/CliftOps.h"
 #include "revng/mlir/Dialect/Clift/Utils/ImportLLVM.h"
@@ -21,7 +22,7 @@
 namespace clift = mlir::clift;
 using namespace clift;
 
-#define enable_printing
+//#define enable_printing
 
 #ifdef enable_printing
 #define myprintf(...) fprintf(stderr, __VA_ARGS__)
@@ -1066,6 +1067,30 @@ private:
     return true;
   }
 
+  bool hasBeenEmitted(const llvm::BasicBlock *BB) {
+    auto It = BlockMapping.find(BB);
+    return It != BlockMapping.end() and It->second.InsertPoint.isSet();
+  }
+
+  void emitGoto(mlir::Location Loc, const llvm::BasicBlock *BB) {
+    myprintl("goto %p", BB);
+    auto [Iterator, Inserted] = BlockMapping.try_emplace(BB);
+
+    if (not Iterator->second.Label)
+      Iterator->second.Label = emitMakeLabel(getLocation(BB));
+
+    if (not Iterator->second.HasAssignLabel
+        and Iterator->second.InsertPoint.isSet()) {
+      myprintl("assign label 2");
+      mlir::OpBuilder::InsertionGuard Guard(Builder);
+      restoreInsertionPointAfter(Builder, Iterator->second.InsertPoint);
+      emitAssignLabel(Iterator->second.Label, getLocation(BB));
+      Iterator->second.HasAssignLabel = true;
+    }
+
+    Builder.create<GoToOp>(Loc, Iterator->second.Label);
+  }
+
   RecursiveCoroutine<void>
   emitBasicBlock(const llvm::BasicBlock *BB,
                  const llvm::BasicBlock *InnerPostDom,
@@ -1076,7 +1101,7 @@ private:
       myprint_ip();
       llvm::errs() << "emitBasicBlock @ " << DebugCaller.function_name() << ":" << DebugCaller.line() << "\n";
       myprint_ip();
-      llvm::errs() << "            BB: " << BB->getName() << "\n";
+      llvm::errs() << "            BB: " << BB << " " << BB->getName() << "\n";
       myprint_ip();
       if (InnerPostDom)
         llvm::errs() << "  InnerPostDom: " << InnerPostDom->getName() << "\n";
@@ -1118,16 +1143,24 @@ private:
         break;
 
       if (auto *Alloca = llvm::dyn_cast<llvm::AllocaInst>(&I)) {
-        clift::ValueType Type = importLLVMType(Alloca->getAllocatedType());
         const auto *Size = Alloca->getArraySize();
 
-        if (not llvm::isa<llvm::Constant>(Size))
-          continue;
+        // C alloca is not yet supported:
+        revng_assert(not Size or llvm::isa<llvm::ConstantInt>(Size));
 
-        if (Alloca->isArrayAllocation())
-          Type = ArrayType::get(Context,
-                                Type,
-                                llvm::cast<llvm::ConstantInt>(Size)->getZExtValue());
+        clift::ValueType Type;
+        if (hasStackTypeMetadata(Alloca)) {
+          Type = importModelType(*getStackTypeFromMetadata(Alloca, Model));
+        } else if (hasVariableTypeMetadata(Alloca)) {
+          Type = importModelType(*getVariableTypeFromMetadata(Alloca, Model));
+        } else {
+          Type = importLLVMType(Alloca->getAllocatedType());
+
+          if (Alloca->isArrayAllocation()) {
+            const auto *S = llvm::cast<llvm::ConstantInt>(Size);
+            Type = ArrayType::get(Context, Type, S->getZExtValue());
+          }
+        }
 
         auto Op =
           Builder.create<LocalVariableOp>(getLocation(Alloca),
@@ -1208,27 +1241,10 @@ private:
     if (Terminal->getNumSuccessors() == 1) {
       const llvm::BasicBlock *Succ = Terminal->getSuccessor(0);
 
-      if (HasGotoMarker) {
-        myprintl("goto %p", Succ);
-        auto [Iterator, Inserted] = BlockMapping.try_emplace(Succ);
-
-        if (not Iterator->second.Label)
-          Iterator->second.Label = emitMakeLabel(getLocation(Succ));
-
-        if (not Iterator->second.HasAssignLabel
-            and Iterator->second.InsertPoint.isSet()) {
-          myprintl("assign label 2");
-          mlir::OpBuilder::InsertionGuard Guard(Builder);
-          restoreInsertionPointAfter(Builder, Iterator->second.InsertPoint);
-          emitAssignLabel(Iterator->second.Label, getLocation(Succ));
-          Iterator->second.HasAssignLabel = true;
-        }
-
-        Builder.create<GoToOp>(getLocation(Terminal),
-                               Iterator->second.Label);
-      } else {
+      if (HasGotoMarker)
+        emitGoto(getLocation(Terminal), Succ);
+      else
         rc_recur emitBasicBlock(Succ, InnerPostDom);
-      }
 
       rc_return;
     }
@@ -1310,9 +1326,15 @@ private:
 
       // Emit case blocks:
       for (auto [I, CH] : llvm::enumerate(Switch->cases())) {
+        const llvm::BasicBlock *Succ = CH.getCaseSuccessor();
+
         revng_assert(Op.getCaseRegion(I).empty());
         Builder.setInsertionPointToEnd(&Op.getCaseRegion(I).emplaceBlock());
-        rc_recur emitBasicBlock(CH.getCaseSuccessor(), InnerPostDom);
+
+        if (hasBeenEmitted(Succ))
+          emitGoto(TerminalLoc, Succ);
+        else
+          rc_recur emitBasicBlock(Succ, InnerPostDom);
       }
 
       // Emit default block:
@@ -1321,7 +1343,11 @@ private:
 
         revng_assert(Op.getDefaultCaseRegion().empty());
         Builder.setInsertionPointToEnd(&Op.getDefaultCaseRegion().emplaceBlock());
-        rc_recur emitBasicBlock(Succ, InnerPostDom);
+
+        if (hasBeenEmitted(Succ))
+          emitGoto(TerminalLoc, Succ);
+        else
+          rc_recur emitBasicBlock(Succ, InnerPostDom);
       }
     } else {
       revng_abort("Unsupported terminal instruction");
@@ -1352,13 +1378,7 @@ private:
     if (MF == nullptr)
       return;
 
-#if 1
-    if (F->getName() == "local_0x401185:Code_x86_64")
-      return;
-    if (F->getName() == "local_0x401000:Code_x86_64")
-      return;
-    if (F->getName() != "local_0x40385b:Code_x86_64")
-      return;
+#if 0
     llvm::errs() << F->getName() << "\n";
 #endif
 

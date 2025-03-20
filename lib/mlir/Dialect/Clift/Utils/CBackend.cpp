@@ -1166,13 +1166,12 @@ public:
         Out << ' ';
       } else {
         rc_recur emitImplicitBlockStatement(S.getElse(), EmitBlocks);
-
-        if (EmitBlocks)
-          Out << '\n';
-
         break;
       }
     }
+
+    if (EmitBlocks)
+      Out << '\n';
   }
 
   RecursiveCoroutine<void> emitSwitchStatement(SwitchOp S) {

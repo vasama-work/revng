@@ -26,6 +26,7 @@ def createImmediateOp
 def createCastOp
   : NativeCodeCall<"$_builder.create<clift::CastOp>($_loc, $0, $1, $2)">;
 
+//===--------------------------- Math identities --------------------------===//
 
 // - -x -> x
 def NegNegPattern
@@ -55,6 +56,40 @@ def DivOnePattern
   : Pat<(Clift_DivOp $arg, (Clift_ImmediateOp $value)),
         (replaceWithValue $arg),
         [(Constraint<CPred<"$0.getValue().isOne()">> $value)]>;
+
+//===------------------------- Comparison negation ------------------------===//
+
+// !(x == y) -> x != y
+def NotCmpEqPattern
+  : Pat<(Clift_LogicalNotOp (Clift_CmpEqOp $lhs, $rhs)),
+        (Clift_CmpNeOp $lhs, $rhs)>;
+
+// !(x != y) -> x == y
+def NotCmpNePattern
+  : Pat<(Clift_LogicalNotOp (Clift_CmpNeOp $lhs, $rhs)),
+        (Clift_CmpEqOp $lhs, $rhs)>;
+
+// !(x < y) -> x >= y
+def NotCmpLtPattern
+  : Pat<(Clift_LogicalNotOp (Clift_CmpLtOp $lhs, $rhs)),
+        (Clift_CmpGeOp $lhs, $rhs)>;
+
+// !(x > y) -> x <= y
+def NotCmpGtPattern
+  : Pat<(Clift_LogicalNotOp (Clift_CmpGtOp $lhs, $rhs)),
+        (Clift_CmpLeOp $lhs, $rhs)>;
+
+// !(x <= y) -> x > y
+def NotCmpLePattern
+  : Pat<(Clift_LogicalNotOp (Clift_CmpLeOp $lhs, $rhs)),
+        (Clift_CmpGtOp $lhs, $rhs)>;
+
+// !(x >= y) -> x < y
+def NotCmpGePattern
+  : Pat<(Clift_LogicalNotOp (Clift_CmpGeOp $lhs, $rhs)),
+        (Clift_CmpLtOp $lhs, $rhs)>;
+
+//===---------------------------- Miscellaneous ---------------------------===//
 
 // (T)123 -> 123
 // Constraint: T is a primitive integer type
@@ -99,8 +134,9 @@ def CollapsibleCastPattern
         [(ValuesAreEqual $inner_kind, $outer_kind),
          (Constraint<CPred<"isCollapsibleCastKind($0.getValue())">> $inner_kind)]>;
 
-// (T*)(i + k)
-// Constraint: k % sizeof(T) == 0
+// (T*)(i + k_1) -> (T*)i + k_2
+// Constraint: k_1 % sizeof(T) == 0
+// k_2 = k_1 / sizeof(T)
 def PointerArithmeticAddImmPattern
   : Pat<(Clift_CastOp:$res (Clift_AddOp $ptr,
                                         (Clift_ImmediateOp:$imm $k)),
@@ -112,8 +148,9 @@ def PointerArithmeticAddImmPattern
          (Clift_AnyPointerType $res),
          (Constraint<CPred<"ptrOffsetDivMod($0, $1).Mod == 0">> $k, $res)]>;
 
-// (T*)(i + n * k)
-// Constraint: k % sizeof(T) == 0
+// (T*)(i + n * k_1) -> (T*)i + n * k_2
+// Constraint: k_1 % sizeof(T) == 0
+// k_2 = k_1 / sizeof(T)
 def PointerArithmeticAddMulImmPattern
   : Pat<(Clift_CastOp:$res (Clift_AddOp $ptr,
                                         (Clift_MulOp $n,

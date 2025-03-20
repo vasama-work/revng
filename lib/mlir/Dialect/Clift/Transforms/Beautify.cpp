@@ -25,6 +25,7 @@ struct BeautifyPass : clift::impl::CliftBeautifyBase<BeautifyPass> {
     mlir::MLIRContext &Context = getContext();
 
     mlir::RewritePatternSet Patterns(&Context);
+    clift::populateBeautifyStatementRewritePatterns(Patterns);
     clift::populateBeautifyExpressionRewritePatterns(Patterns);
 
     if (mlir::applyPatternsAndFoldGreedily(getOperation(),

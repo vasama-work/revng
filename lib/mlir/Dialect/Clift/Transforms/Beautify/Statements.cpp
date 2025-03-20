@@ -11,6 +11,14 @@ namespace clift = mlir::clift;
 
 namespace {
 
+static bool isEmptyRegionOrBlock(mlir::Region &R) {
+  return R.empty() or R.front().empty();
+}
+
+static bool hasEmptyBlock(mlir::Region &R) {
+  return not R.empty() and R.front().empty();
+}
+
 // WIP: Merge with the one in CBackend.cpp.
 template<typename Operation = mlir::Operation *>
 static Operation getOnlyOperation(mlir::Region &R) {
@@ -48,6 +56,86 @@ static clift::YieldOp getExpressionYieldOp(mlir::Region &R) {
 }
 
 
+#if 0
+class FallthroughRange {
+  class sentinel {
+  public:
+    explicit sentinel() = default;
+  };
+
+  class iterator {
+  public:
+    explicit iterator(mlir::Block::iterator Pos) : Pos(Pos) {}
+
+    mlir::Operation &operator*() const {
+      revng_assert(Op != nullptr);
+      return *Op;
+    }
+
+    iterator &operator++() & {
+      revng_assert(Op != nullptr);
+
+      auto Pos = BlockPosition::get(Op);
+      auto &[B, I] = Pos;
+
+      while (I == B->end()) {
+        mlir::Operation *ParentOp = B->getParentOp();
+        if (mlir::isa<clift::FunctionOp, clift::LoopOpInterface>(ParentOp))
+          return setEnd();
+
+        
+      }
+
+      Op = Pos.getOperation();
+      return *this;
+    }
+
+    [[nodiscard]] iterator operator++(int) & {
+      iterator It = *this;
+      ++*this;
+      return It;
+    }
+
+    friend bool operator==(iterator const& It, sentinel) {
+      return Op == nullptr;
+    }
+
+  private:
+    mlir::Operation *Op;
+
+    iterator &setEnd() {
+      Op = nullptr;
+      return *this;
+    }
+  };
+
+public:
+  explicit FallthroughRange(mlir::Block *Block, mlir::Block::iterator Pos)
+    : Block(Block), Pos(Pos) {}
+
+  iterator begin() const {
+    return iterator(Pos != Block->end() ? &*Pos : nullptr);
+  }
+
+  sentinel end() const { return sentinel(); }
+
+private:
+  mlir::Block *Block;
+  mlir::Block::iterator Pos;
+};
+
+static FallthroughRange walkOperationsAfter(mlir::Operation *Op) {
+  return FallthroughRange(std::next(Op->getIterator()));
+}
+#endif
+
+
+[[maybe_unused]] // WIP
+static void removeBlock(mlir::Block *Block) {
+  revng_assert(Block->getParent() != nullptr);
+  Block->getParent()->getBlocks().remove(Block);
+}
+
 template<typename CallableT>
 static void replaceExpression(mlir::PatternRewriter &Rewriter,
                               mlir::Region &Region,
@@ -61,7 +149,7 @@ static void replaceExpression(mlir::PatternRewriter &Rewriter,
   mlir::Value Value = std::forward<CallableT>(Callable)(Yield.getValue());
 
   // WIP: Is this assign legal? Should we notify the rewriter somehow?
-  Yield->getOpOperand(0).assign(Value);
+  Yield->getOpOperand(0).set(Value);
 }
 
 template<typename CallableT>
@@ -82,14 +170,39 @@ static void mergeExpressionInto(mlir::PatternRewriter &Rewriter,
                                                         TargetYield.getValue());
 
   // WIP: Is this assign legal? Should we notify the rewriter somehow?
-  TargetYield->getOpOperand(0).assign(Value);
+  TargetYield->getOpOperand(0).set(Value);
 }
 
-static void inlineBlockBefore(mlir::PatternRewriter &Rewriter,
-                              mlir::Block* Src,
-                              mlir::Block* Dst,
-                              mlir::Block::iterator Pos);
 
+//===------------------ Future PatternRewriter functions ------------------===//
+
+static void inlineBlockBefore(mlir::Block* Src,
+                              mlir::Block* Dst,
+                              mlir::Block::iterator Pos) {
+  Dst->getOperations().splice(Pos, Src->getOperations());
+}
+
+#if 0
+static void moveBlockBefore(mlir::PatternRewriter &Rewriter,
+                            mlir::Block *Block,
+                            mlir::Region *Region,
+                            mlir::Region::iterator Pos) {
+  revng_assert(Block->getParent() != Region);
+  Rewriter.updateRootInPlace(If.getOperation(), [&]() {
+    Region->getBlocks().splice(Pos,
+                              Block->getParent()->getBlocks(),
+                              Block->getIterator());
+  });
+}
+#endif
+
+
+static mlir::Type getBooleanType(mlir::MLIRContext *Context) {
+  return clift::PrimitiveType::get(Context,
+                                   clift::PrimitiveKind::SignedKind,
+                                   1,
+                                   mlir::BoolAttr::get(Context, false));
+}
 
 template<typename OpT = mlir::Operation *, typename PredicateT>
 static OpT getTrailingOp(mlir::Region &Region, PredicateT &&Predicate) {
@@ -102,13 +215,13 @@ static OpT getTrailingOp(mlir::Region &Region, PredicateT &&Predicate) {
   if (Block.empty())
     return {};
 
-  mlir::Operation *Op = Block.back();
+  mlir::Operation *Op = &Block.back();
   if constexpr (std::is_same_v<OpT, mlir::Operation *>) {
-    if (Callable(Op))
+    if (Predicate(Op))
       return Op;
   } else {
     if (auto Op2 = mlir::dyn_cast<OpT>(Op)) {
-      if (Callable(Op2))
+      if (Predicate(Op2))
         return Op2;
     }
   }
@@ -116,54 +229,126 @@ static OpT getTrailingOp(mlir::Region &Region, PredicateT &&Predicate) {
   return {};
 }
 
+[[maybe_unused]] // WIP
+static bool isJumpToStartOf(clift::GoToOp Goto, mlir::Region &Region) {
+  if (Region.empty())
+    return false;
+
+  for (mlir::Operation &Op : Region.front()) {
+    auto AssignLabel = mlir::dyn_cast<clift::AssignLabelOp>(&Op);
+
+    if (not AssignLabel)
+      break;
+
+    if (Goto.getLabel() == AssignLabel.getLabel())
+      return true;
+  }
+
+  return false;
+}
+
+static bool isJumpOp(mlir::Operation *Op) {
+  return Op->hasTrait<mlir::OpTrait::clift::NoFallthrough>();
+}
+
 static clift::StatementOpInterface
 getTrailingJumpStatement(mlir::Region &Region) {
   return getTrailingOp<clift::StatementOpInterface>(Region, [](auto Op) {
-    return Op->hasTrait<clift::NoFallThrough>();
+    return isJumpOp(Op.getOperation());
   });
 }
 
-static mlir::Type getBooleanType(mlir::MLIRContext *Context) {
-  return clift::PrimitiveType::get(Context,
-                                   clift::PrimitiveKind::SignedKind,
-                                   1,
-                                   mlir::BoolAttr::get(Context, false));
+
+struct BlockPosition {
+  mlir::Block *Block;
+  mlir::Block::iterator Pos;
+
+  static BlockPosition get(mlir::Operation *Op) {
+    return BlockPosition{ Op->getBlock(), Op->getIterator() };
+  }
+
+  static BlockPosition getNext(mlir::Operation *Op) {
+    return BlockPosition{ Op->getBlock(), std::next(Op->getIterator()) };
+  }
+
+  static BlockPosition getEnd(mlir::Region &R) {
+    return { &R.front(), R.front().end() };
+  }
+
+  mlir::Operation *getOperation() const {
+    return Block == nullptr or Pos == Block->end() ? nullptr : &*Pos;
+  }
+
+  friend bool operator==(BlockPosition const&, BlockPosition const&) = default;
+};
+
+static BlockPosition findFallthroughTarget(BlockPosition Position) {
+  auto &[B, I] = Position;
+
+  while (I == B->end()) {
+    mlir::Operation *ParentOp = B->getParentOp();
+    if (mlir::isa<clift::FunctionOp, clift::LoopOpInterface>(ParentOp))
+      break;
+
+    Position = BlockPosition::getNext(ParentOp);
+  }
+
+  return Position;
 }
 
-static void invertIfStatement(mlir::PatternRewriter &Rewriter,
-                              clift::IfOp If) {
-  revng_assert(not If.getElse().empty());
+static BlockPosition findJumpTarget(mlir::Operation *Op) {
+  if (mlir::isa<clift::ReturnOp>(Op)) {
+    auto F = Op->getParentOfType<clift::FunctionOp>();
+    return BlockPosition::getEnd(F.getBody());
+  }
 
-  mlir::Region &Then = If.getThen();
-  mlir::Region &Else = If.getElse();
+  if (mlir::isa<clift::LoopContinueOp>(Op)) {
+    auto L = Op->getParentOfType<clift::LoopOpInterface>();
+    return BlockPosition::getEnd(L.getLoopBody());
+  }
 
-  mlir::Block *ThenBlock = &Then.front();
-  mlir::Block *ElseBlock = &Else.front();
+  if (mlir::isa<clift::SwitchBreakOp>(Op)) {
+    auto S = Op->getParentOfType<clift::SwitchOp>();
+    return findFallthroughTarget(BlockPosition::getNext(S.getOperation()));
+  }
 
-  // WIP: Is this legal? Do we need to notify the rewriter somehow?
-  ThenBlock.remove();
-  ElseBlock.remove();
+  if (auto G = mlir::dyn_cast<clift::GoToOp>(Op))
+    return BlockPosition::get(G.getAssignLabelOp().getOperation());
 
-  Then.push_back(ElseBlock);
-  Else.push_back(ThenBlock);
+  return {};
+}
+
+
+static void invertIfStatement(mlir::PatternRewriter &Rewriter, clift::IfOp If) {
+  mlir::Region *Then = &If.getThen();
+  mlir::Region *Else = &If.getElse();
+  revng_assert(not Else->empty());
 
   replaceExpression(Rewriter, If.getCondition(), [&](mlir::Value Value) {
-    auto BooleanType =
-      clift::PrimitiveType::get(Rewriter.getContext(),
-                                clift::PrimitiveKind::SignedKind,
-                                1,
-                                mlir::BoolAttr::get(Rewriter.getContext(),
-                                                    false));
-
+    auto BooleanType = getBooleanType(Rewriter.getContext());
     auto Op = Rewriter.create<clift::LogicalNotOp>(If.getLoc(),
                                                    BooleanType,
                                                    Value);
-
     return Op.getResult();
+  });
+
+  Rewriter.updateRootInPlace(If.getOperation(), [&]() {
+    mlir::Block *ThenBlock = Then->empty() ? nullptr : &Then->front();
+    mlir::Block *ElseBlock = &Else->front();
+
+    if (ThenBlock != nullptr)
+      Then->getBlocks().remove(ThenBlock);
+
+    Else->getBlocks().remove(ElseBlock);
+    Then->getBlocks().push_back(ElseBlock);
+
+    if (ThenBlock != nullptr)
+      Else->getBlocks().push_back(ThenBlock);
   });
 }
 
 
+#if 0
 struct NestedIfCombiningPattern : mlir::RewritePattern {
   NestedIfCombiningPattern(mlir::MLIRContext *Context) :
     // WIP: Think more about the benefit
@@ -175,7 +360,7 @@ struct NestedIfCombiningPattern : mlir::RewritePattern {
     auto OuterIf = mlir::cast<clift::IfOp>(Root);
     auto InnerIf = getOnlyOperation<clift::IfOp>(OuterIf.getThen());
     if (not InnerIf) {
-      return notifyMatchFailure(Root, [&](mlir::Diagnostic &Diag) {
+      return Rewriter.notifyMatchFailure(Root, [&](mlir::Diagnostic &Diag) {
         Diag << "The clift.if does not contain a nested clift.if.";
       });
     }
@@ -185,25 +370,25 @@ struct NestedIfCombiningPattern : mlir::RewritePattern {
 
     if (not InnerElse.empty()) {
       if (OuterElse.empty()) {
-        return notifyMatchFailure(Root, [&](mlir::Diagnostic &Diag) {
+        return Rewriter.notifyMatchFailure(Root, [&](mlir::Diagnostic &Diag) {
           Diag << "The inner clift.if has a non-empty else.";
         });
       }
 
       auto Goto = getOnlyOperation<clift::GoToOp>(InnerElse);
       if (not Goto) {
-        return notifyMatchFailure(Root, [&](mlir::Diagnostic &Diag) {
+        return Rewriter.notifyMatchFailure(Root, [&](mlir::Diagnostic &Diag) {
           Diag << "The inner clift.if does not contain a nested clift.goto.";
         });
       }
 
       if (not isJumpToStartOf(Goto, OuterElse)) {
-        return notifyMatchFailure(Root, [&](mlir::Diagnostic &Diag) {
+        return Rewriter.notifyMatchFailure(Root, [&](mlir::Diagnostic &Diag) {
           Diag << "The clift.goto does not jump to the outer clift.if else.";
         });
       }
     } else if (not OuterElse.empty()) {
-      return notifyMatchFailure(Root, [&](mlir::Diagnostic &Diag) {
+      return Rewriter.notifyMatchFailure(Root, [&](mlir::Diagnostic &Diag) {
         Diag << "The outer clift.if has a non-empty else.";
       });
     }
@@ -215,8 +400,9 @@ struct NestedIfCombiningPattern : mlir::RewritePattern {
       mlir::Location Loc = Rewriter.getFusedLoc(OuterIf.getLoc(),
                                                 InnerIf.getLoc());
 
+      auto BooleanType = getBooleanType(Rewriter.getContext());
       auto Op = Rewriter.create<clift::LogicalAndOp>(Loc,
-                                                     getBooleanType(),
+                                                     BooleanType,
                                                      OuterValue,
                                                      InnerValue);
 
@@ -228,10 +414,62 @@ struct NestedIfCombiningPattern : mlir::RewritePattern {
     mlir::Block *InnerThenBlock = &InnerThen.front();
 
     // WIP: Should we notify the rewriter here?
-    InnerThenBlock->remove();
-    Rewriter.eraseBlock(OuterThen.front());
+    removeBlock(InnerThenBlock);
+    Rewriter.eraseBlock(&OuterThen.front());
     OuterThen.push_back(InnerThenBlock);
 
+    return mlir::success();
+  }
+};
+#endif
+
+struct LabelCombiningPattern : mlir::RewritePattern {
+  LabelCombiningPattern(mlir::MLIRContext *Context) :
+    // WIP: Think more about the benefit
+    RewritePattern("clift.assign_label", 3, Context) {}
+
+  mlir::LogicalResult
+  matchAndRewrite(mlir::Operation *Root,
+                  mlir::PatternRewriter &Rewriter) const override {
+    mlir::Block::iterator Pos = std::next(Root->getIterator());
+
+    if (Pos == Root->getBlock()->end())
+      return mlir::failure();
+
+    auto Label2 = mlir::dyn_cast<clift::AssignLabelOp>(&*Pos);
+    if (not Label2)
+      return mlir::failure();
+
+    auto Label1 = mlir::cast<clift::AssignLabelOp>(Root);
+    Rewriter.replaceAllUsesWith(Label2.getLabel(), Label1.getLabel());
+    Rewriter.eraseOp(Label2.getOperation());
+    return mlir::success();
+  }
+};
+
+struct EmptyIfInversionPattern : mlir::RewritePattern {
+  EmptyIfInversionPattern(mlir::MLIRContext *Context) :
+    // WIP: Think more about the benefit
+    RewritePattern("clift.if", 3, Context) {}
+
+  mlir::LogicalResult
+  matchAndRewrite(mlir::Operation *Root,
+                  mlir::PatternRewriter &Rewriter) const override {
+    auto If = mlir::cast<clift::IfOp>(Root);
+
+    if (not isEmptyRegionOrBlock(If.getThen())) {
+      return Rewriter.notifyMatchFailure(Root, [&](mlir::Diagnostic &Diag) {
+        Diag << "The clift.if has a non-empty then-region or block.";
+      });
+    }
+
+    if (isEmptyRegionOrBlock(If.getElse())) {
+      return Rewriter.notifyMatchFailure(Root, [&](mlir::Diagnostic &Diag) {
+        Diag << "The clift.if has an empty else-region or block.";
+      });
+    }
+
+    invertIfStatement(Rewriter, If);
     return mlir::success();
   }
 };
@@ -241,21 +479,19 @@ struct EmptyElseEliminationPattern : mlir::RewritePattern {
     // WIP: Think more about the benefit
     RewritePattern("clift.if", 3, Context) {}
 
-  mlir::LogicalResult match(mlir::Operation *Root) const override {
+  mlir::LogicalResult
+  matchAndRewrite(mlir::Operation *Root,
+                  mlir::PatternRewriter &Rewriter) const override {
     auto If = mlir::cast<clift::IfOp>(Root);
 
-    if (not If.getElse().empty()) {
-      return notifyMatchFailure(Root, [&](mlir::Diagnostic &Diag) {
-        Diag << "The clift.if has a non-empty else region.";
+    if (not hasEmptyBlock(If.getElse())) {
+      return Rewriter.notifyMatchFailure(Root, [&](mlir::Diagnostic &Diag) {
+        Diag << "The clift.if has a non-empty else-region.";
       });
     }
 
-    return mlir::success();
-  }
-
-  void rewrite(mlir::PatternRewriter &Rewriter) const override {
-    auto If = mlir::cast<clift::IfOp>(Root);
     Rewriter.eraseBlock(&If.getElse().front());
+    return mlir::success();
   }
 };
 
@@ -269,29 +505,54 @@ struct TerminalIfElseUnwrappingPattern : mlir::RewritePattern {
                   mlir::PatternRewriter &Rewriter) const override {
     auto If = mlir::cast<clift::IfOp>(Root);
 
-    if (If.getElse().empty()) {
-      return notifyMatchFailure(Root, [&](mlir::Diagnostic &Diag) {
-        Diag << "The clift.if has an empty else-region.";
+    if (isEmptyRegionOrBlock(If.getElse())) {
+      return Rewriter.notifyMatchFailure(Root, [&](mlir::Diagnostic &Diag) {
+        Diag << "The clift.if has an empty else-region or block.";
       });
     }
 
     if (getTrailingJumpStatement(If.getElse())) {
       invertIfStatement(Rewriter, If);
     } else if (not getTrailingJumpStatement(If.getThen())) {
-      return notifyMatchFailure(Root, [&](mlir::Diagnostic &Diag) {
+      return Rewriter.notifyMatchFailure(Root, [&](mlir::Diagnostic &Diag) {
         Diag << "The clift.if contains no trailing jumps.";
       });
     }
 
-    mlir::Block *ElseBlock = If.getElse().front();
+    mlir::Block *ElseBlock = &If.getElse().front();
+    Rewriter.updateRootInPlace(If.getOperation(), [&]() {
+      inlineBlockBefore(ElseBlock,
+                        Root->getBlock(),
+                        std::next(Root->getIterator()));
+    });
 
-    inlineBlockBefore(Rewriter,
-                      ElseBlock,
-                      Root->getBlock(),
-                      Root->getIterator());
+    Rewriter.eraseBlock(ElseBlock);
+    return mlir::success();
+  }
+};
 
-    // WIP: Do we need to notify the rewriter about this?
-    ElseBlock->erase();
+struct TrivialJumpEliminationPattern
+  : mlir::OpTraitRewritePattern<mlir::OpTrait::clift::NoFallthrough> {
+    TrivialJumpEliminationPattern(mlir::MLIRContext *Context) :
+    // WIP: Think more about the benefit
+    OpTraitRewritePattern(Context, 3) {}
+
+  mlir::LogicalResult
+  matchAndRewrite(mlir::Operation *Root,
+                  mlir::PatternRewriter &Rewriter) const override {
+    if (auto R = mlir::dyn_cast<clift::ReturnOp>(Root)) {
+      if (not R.getResult().empty())
+        return mlir::failure();
+    }
+
+    auto JumpTarget = findJumpTarget(Root);
+    auto Fallthrough = findFallthroughTarget(BlockPosition::getNext(Root));
+
+    if (JumpTarget != Fallthrough)
+      return mlir::failure();
+
+    Rewriter.eraseOp(Root);
+    return mlir::success();
   }
 };
 
@@ -309,6 +570,7 @@ struct OptimizedWhileConversionPattern : mlir::RewritePattern {
 };
 #endif
 
+#if 0
 struct LoopDetectionPattern : mlir::RewritePattern {
   LoopDetectionPattern(mlir::MLIRContext *Context) :
     // WIP: Think more about the benefit
@@ -320,5 +582,15 @@ struct LoopDetectionPattern : mlir::RewritePattern {
     
   }
 };
+#endif
 
 } // namespace
+
+void clift::populateBeautifyStatementRewritePatterns(RewritePatternSet &Set) {
+  Set.add<LabelCombiningPattern>(Set.getContext());
+  //Set.add<NestedIfCombiningPattern>(Set.getContext());
+  Set.add<EmptyIfInversionPattern>(Set.getContext());
+  Set.add<EmptyElseEliminationPattern>(Set.getContext());
+  Set.add<TerminalIfElseUnwrappingPattern>(Set.getContext());
+  Set.add<TrivialJumpEliminationPattern>(Set.getContext());
+}

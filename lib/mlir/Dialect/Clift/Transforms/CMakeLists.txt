@@ -6,6 +6,7 @@ add_mlir_dialect_library(
   MLIRCliftTransforms
   SHARED
   Beautify/Expressions.cpp
+  Beautify/Statements.cpp
   Beautify.cpp
   CBackend.cpp
   CSemantics.cpp

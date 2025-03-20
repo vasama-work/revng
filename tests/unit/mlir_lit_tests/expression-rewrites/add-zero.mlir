@@ -5,7 +5,6 @@
 // RUN: %revngcliftopt %s --beautify | FileCheck %s
 
 !void = !clift.primitive<void 0>
-
 !int32_t = !clift.primitive<signed 4>
 
 !f = !clift.defined<#clift.func<"/model-type/1001" : !void(!int32_t)>>
