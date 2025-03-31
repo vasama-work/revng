@@ -134,7 +134,7 @@ public:
     revng_abort("Expected isolated model function.");
   }
 
-  const model::TypeDefinition &getModelTypeDefinition(TypeDefinitionAttr Type) {
+  const model::TypeDefinition &getModelTypeDefinition(DefinedType Type) {
     auto GetType = [&](const auto &Rank) -> const model::TypeDefinition * {
       if (auto L = pipeline::locationFromString(Rank, Type.getHandle())) {
         auto It = C.Binary.TypeDefinitions().find(L->at(Rank));
@@ -210,23 +210,22 @@ public:
         Item.Kind = StackItemKind::Array;
         Type = T.getElementType();
       } else if (auto T = mlir::dyn_cast<DefinedType>(Type)) {
-        auto D = T.getElementType();
-        auto F = mlir::dyn_cast<FunctionTypeAttr>(D);
+        auto F = mlir::dyn_cast<FunctionType>(T);
 
         // Expand the function type if function type expansion is enabled.
         if (F and ExpandFunctionTypes) {
           Item.Kind = StackItemKind::Function;
           Type = F.getReturnType();
         } else {
-          if (mlir::isa<EnumTypeAttr>(D))
+          if (mlir::isa<EnumType>(T))
             Out << C.getKeyword(Keyword::Enum) << ' ';
-          else if (mlir::isa<StructTypeAttr>(D))
+          else if (mlir::isa<StructType>(T))
             Out << C.getKeyword(Keyword::Struct) << ' ';
-          else if (mlir::isa<UnionTypeAttr>(D))
+          else if (mlir::isa<UnionType>(T))
             Out << C.getKeyword(Keyword::Union) << ' ';
 
           EmitConst(T);
-          Out << C.getLocationReference(getModelTypeDefinition(D));
+          Out << C.getLocationReference(getModelTypeDefinition(T));
           NeedSpace = true;
         }
       }
@@ -300,8 +299,7 @@ public:
         Out << ']';
       } break;
       case StackItemKind::Function: {
-        auto T = mlir::dyn_cast<DefinedType>(SI.Type);
-        auto F = mlir::dyn_cast<FunctionTypeAttr>(T.getElementType());
+        auto F = mlir::dyn_cast<FunctionType>(SI.Type);
 
         if (I != 0)
           Out << ')';
@@ -370,8 +368,8 @@ public:
       bool Signed = T.getKind() == PrimitiveKind::SignedKind;
       Out << getIntegerConstant(Value, *Integer, Signed);
     } else {
-      auto TypeAttr = mlir::cast<DefinedType>(Type).getElementType();
-      const auto &ModelType = getModelTypeDefinition(TypeAttr);
+      auto D = mlir::cast<DefinedType>(Type);
+      const auto &ModelType = getModelTypeDefinition(D);
       const auto &ModelEnum = llvm::cast<model::EnumDefinition>(ModelType);
 
       auto It = ModelEnum.Entries().find(Value);
@@ -529,7 +527,7 @@ public:
     Out << C.getOperator(E.isIndirect() ? Operator::Arrow : Operator::Dot);
 
     const model::TypeDefinition
-      &ModelType = getModelTypeDefinition(E.getClassTypeAttr());
+      &ModelType = getModelTypeDefinition(E.getClassType());
 
     if (auto *T = llvm::dyn_cast<model::StructDefinition>(&ModelType))
       emitClassMemberReference(*T, E.getFieldAttr().getOffset());

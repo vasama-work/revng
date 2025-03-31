@@ -9,3 +9,5 @@
 //
 #include "revng/mlir/Dialect/Clift/IR/CliftAttrInterfaces.cpp.inc"
 #include "revng/mlir/Dialect/Clift/IR/CliftTypeInterfaces.cpp.inc"
+#include "revng/mlir/Dialect/Clift/IR/CliftTypeInterfaces1.cpp.inc"
+#include "revng/mlir/Dialect/Clift/IR/CliftTypeInterfaces2.cpp.inc"
