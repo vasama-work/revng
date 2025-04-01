@@ -80,6 +80,43 @@ enum class OperatorPrecedence {
   Ternary = Assignment,
 };
 
+enum class IntegerRadix : bool {
+  Dec,
+  Hex,
+};
+
+template<uint64_t Radix>
+static double uniqueDigitsToRadixRatio(uint64_t Value) {
+  uint8_t Digits[Radix] = {};
+  uint8_t UniqueDigitCount = 0;
+  uint8_t DigitCount = 0;
+
+  while (Value != 0) {
+    uint8_t Digit = Value % Radix;
+    Value = Value / Radix;
+    UniqueDigitCount += Digits[Digit]++ == 0;
+    ++DigitCount;
+  }
+
+  return static_cast<double>(UniqueDigitCount) / DigitCount;
+}
+
+static IntegerRadix deduceIntegerRadix(uint64_t Value) {
+  if (Value < 0x10)
+    return IntegerRadix::Dec;
+
+  if (Value > 64 and std::has_single_bit(Value))
+    return IntegerRadix::Hex;
+
+  double DecRatio = uniqueDigitsToRadixRatio<10>(Value);
+  double HexRatio = uniqueDigitsToRadixRatio<16>(Value);
+
+  if (DecRatio / HexRatio >= 1.20)
+    return IntegerRadix::Hex;
+
+  return IntegerRadix::Dec;
+}
+
 class CEmitter {
 public:
   explicit CEmitter(const TargetCImplementation &Target,
@@ -338,7 +375,13 @@ public:
       llvm::raw_svector_ostream Stream(String);
 
       if (Signed and static_cast<int64_t>(Value) < 0) {
-        Stream << static_cast<int64_t>(Value);
+        Stream << '-';
+        Value = ~Value + 1;
+      }
+
+      if (deduceIntegerRadix(Value) == IntegerRadix::Hex) {
+        Stream << "0x";
+        Stream.write_hex(Value);
       } else {
         Stream << Value;
       }
