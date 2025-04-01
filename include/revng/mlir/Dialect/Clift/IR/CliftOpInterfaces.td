@@ -57,4 +57,17 @@ def Clift_BranchOpInterface : Clift_OpInterface<"BranchOpInterface"> {
   ];
 }
 
+def Clift_LoopOpInterface : Clift_OpInterface<"LoopOpInterface"> {
+  let methods = [
+    InterfaceMethod<
+      /*desc=*/"",
+      "mlir::Region &", "getLoopRegion", (ins),
+      /*methodBody=*/[{}],
+      /*defaultImplementation=*/[{
+        return $_op.getBody();
+      }]
+    >
+  ];
+}
+
 #endif
