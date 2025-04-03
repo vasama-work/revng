@@ -126,23 +126,28 @@ public:
     Builder.setOutputStream(this->Out);
   }
 
-  const model::Segment &getModelSegment(GlobalVariableOp Op) {
+  static llvm::StringRef getDefaultName(llvm::StringRef Name,
+                                        llvm::StringRef Default) {
+    return Name.empty() ? Default : Name;
+  }
+
+  const model::Segment *getModelSegment(GlobalVariableOp Op) {
     auto L = pipeline::locationFromString(revng::ranks::Segment,
                                           Op.getHandle());
     if (not L)
-      revng_abort("Unrecognizable global variable unique handle.");
+      return nullptr;
 
     auto Key = L->at(revng::ranks::Segment);
     auto It = C.Binary.Segments().find(Key);
     if (It == C.Binary.Segments().end())
       revng_abort("No matching model segment.");
-    return *It;
+    return &*It;
   }
 
   using ModelFunctionVariant = std::variant<const model::Function *,
                                             const model::DynamicFunction *>;
 
-  ModelFunctionVariant getModelFunctionVariant(FunctionOp Op) {
+  std::optional<ModelFunctionVariant> getModelFunctionVariant(FunctionOp Op) {
     if (auto L = pipeline::locationFromString(revng::ranks::Function,
                                               Op.getHandle())) {
       auto [Key] = L->at(revng::ranks::Function);
@@ -161,14 +166,15 @@ public:
       return &*It;
     }
 
-    revng_abort("Unrecognizable function unique handle.");
+    return std::nullopt;
   }
 
-  const model::Function &getModelFunction(FunctionOp Op) {
-    auto Variant = getModelFunctionVariant(Op);
-    if (auto F = std::get_if<const model::Function *>(&Variant))
-      return **F;
-    revng_abort("Expected isolated model function.");
+  const model::Function *getIsolatedModelFunction(FunctionOp Op) {
+    if (auto OptionalVariant = getModelFunctionVariant(Op))
+      if (auto F = std::get_if<const model::Function *>(&*OptionalVariant))
+        return *F;
+
+    return nullptr;
   }
 
   const model::TypeDefinition &getModelTypeDefinition(DefinedType Type) {
@@ -187,7 +193,7 @@ public:
     if (const auto *T = GetType(revng::ranks::ArtificialStruct))
       return *T;
 
-    revng_abort("Unrecognized type unique handle");
+    revng_abort("Model type not found");
   }
 
   void emitPrimitiveType(PrimitiveType Type) {
@@ -537,12 +543,19 @@ public:
     revng_assert(SymbolOp);
 
     if (auto G = mlir::dyn_cast<GlobalVariableOp>(SymbolOp)) {
-      Out << C.getLocationReference(getModelSegment(G));
+      if (const model::Segment *Segment = getModelSegment(G))
+        Out << C.getLocationReference(*getModelSegment(G));
+      else
+        Out << getDefaultName(G.getName(), "<unnamed-variable>");
     } else if (auto F = mlir::dyn_cast<FunctionOp>(SymbolOp)) {
-      auto Visitor = [&](const auto *ModelFunction) {
-        Out << C.getLocationReference(*ModelFunction);
-      };
-      std::visit(Visitor, getModelFunctionVariant(F));
+      if (auto OptionalVariant = getModelFunctionVariant(F)) {
+        auto Visitor = [&](const auto *ModelFunction) {
+          Out << C.getLocationReference(*ModelFunction);
+        };
+        std::visit(Visitor, *OptionalVariant);
+      } else {
+        Out << getDefaultName(F.getName(), "<unnamed-function>");
+      }
     } else {
       revng_abort("Unsupported global operation");
     }
@@ -550,13 +563,13 @@ public:
     rc_return;
   }
 
-  template<typename Class>
-  void emitClassMemberReference(const Class &TheClass, uint64_t Key) {
-    auto It = TheClass.Fields().find(Key);
-    if (It == TheClass.Fields().end())
+  template<typename ClassT>
+  void emitClassMemberReference(const ClassT &Class, uint64_t Key) {
+    auto It = Class.Fields().find(Key);
+    if (It == Class.Fields().end())
       revng_abort("Class member not found.");
 
-    Out << C.getLocation(/*IsDefinition=*/false, TheClass, *It);
+    Out << C.getLocation(/*IsDefinition=*/false, Class, *It);
   }
 
   void emitRawFunctionRegisterReference(const model::RawFunctionDefinition &RFT,
@@ -1321,10 +1334,13 @@ public:
   //===----------------------------- Functions ----------------------------===//
 
   RecursiveCoroutine<void> emitFunction(FunctionOp Op) {
-    const model::Function &ModelFunction = getModelFunction(Op);
-    CurrentFunction = &ModelFunction;
+    const model::Function *ModelFunction = getIsolatedModelFunction(Op);
+    revng_assert(ModelFunction != nullptr);
 
-    auto *MFT = llvm::cast<model::DefinedType>(ModelFunction.Prototype().get());
+    CurrentFunction = ModelFunction;
+
+    auto *MFT = llvm::cast<model::DefinedType>(ModelFunction->Prototype()
+                                                 .get());
     const model::TypeDefinition *MFD = MFT->Definition().get();
 
     auto ClearParameterNames = llvm::make_scope_exit([&]() {
@@ -1333,7 +1349,7 @@ public:
 
     auto PushParameterName = [&](llvm::StringRef ParameterName) {
       ParameterNames.push_back(C.getArgumentLocationReference(ParameterName,
-                                                              ModelFunction));
+                                                              *ModelFunction));
     };
 
     if (auto F = llvm::dyn_cast<model::CABIFunctionDefinition>(MFD)) {
@@ -1359,12 +1375,12 @@ public:
     // Scope tags are applied within this scope:
     {
       auto OuterScope = C.scopeTag(ptml::c::scopes::Function).scope(Out);
-      C.printFunctionPrototype(*MFD, ModelFunction, /*SingleLine=*/false);
+      C.printFunctionPrototype(*MFD, *ModelFunction, /*SingleLine=*/false);
 
       Out << ' ';
       Scope InnerScope(Out, ptml::c::scopes::FunctionBody);
 
-      if (const model::Type *T = ModelFunction.StackFrameType().get()) {
+      if (const model::Type *T = ModelFunction->StackFrameType().get()) {
         const auto *D = llvm::cast<model::DefinedType>(T)->Definition().get();
 
         if (C.shouldInline(D->key()))
