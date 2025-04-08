@@ -9,6 +9,7 @@
 #include "revng/ADT/RecursiveCoroutine.h"
 #include "revng/Support/PTMLC.h"
 #include "revng/TypeNames/PTMLCTypeBuilder.h"
+#include "revng/mlir/Dialect/Clift/IR/CliftOpHelpers.h"
 #include "revng/mlir/Dialect/Clift/Utils/CBackend.h"
 
 namespace clift = mlir::clift;
@@ -19,28 +20,6 @@ namespace {
 
 static RecursiveCoroutine<void> noopCoroutine() {
   rc_return;
-}
-
-template<typename Operation = mlir::Operation *>
-static Operation getOnlyOperation(mlir::Region &R) {
-  revng_assert(R.hasOneBlock());
-  mlir::Block &B = R.front();
-  auto Beg = B.begin();
-  auto End = B.end();
-
-  if (Beg == End)
-    return {};
-
-  mlir::Operation *Op = &*Beg;
-
-  if (++Beg != End)
-    return {};
-
-  if constexpr (std::is_same_v<Operation, mlir::Operation *>) {
-    return Op;
-  } else {
-    return mlir::dyn_cast<Operation>(Op);
-  }
 }
 
 static llvm::StringRef getCIntegerLiteralSuffix(const CIntegerKind Integer,
@@ -1136,7 +1115,7 @@ public:
       if (If.getElse().empty())
         return true;
 
-      auto ElseIf = getOnlyOperation<IfOp>(If.getElse());
+      auto ElseIf = clift::getOnlyOperation<IfOp>(If.getElse());
 
       if (not ElseIf)
         return mayElideBraces(If.getElse());
@@ -1166,7 +1145,7 @@ public:
 
       Out << C.getKeyword(Keyword::Else);
 
-      if (auto ElseIf = getOnlyOperation<IfOp>(S.getElse())) {
+      if (auto ElseIf = clift::getOnlyOperation<IfOp>(S.getElse())) {
         S = ElseIf;
         Out << ' ';
       } else {
@@ -1306,7 +1285,7 @@ public:
   }
 
   static bool mayElideBraces(mlir::Region &R) {
-    mlir::Operation *OnlyOp = getOnlyOperation(R);
+    mlir::Operation *OnlyOp = clift::getOnlyOperation(R);
     return OnlyOp != nullptr and mayElideBraces(OnlyOp);
   }
 
