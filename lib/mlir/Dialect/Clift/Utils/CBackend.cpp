@@ -1298,6 +1298,7 @@ public:
 
   static bool mayElideBraces(mlir::Operation *Op) {
     return mlir::isa<ExpressionStatementOp,
+                     GoToOp,
                      ReturnOp,
                      SwitchBreakOp,
                      LoopBreakOp,
