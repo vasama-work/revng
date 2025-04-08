@@ -36,4 +36,25 @@ def Clift_ExpressionOpInterface : Clift_OpInterface<"ExpressionOpInterface"> {
   ];
 }
 
+def Clift_BranchOpInterface : Clift_OpInterface<"BranchOpInterface"> {
+  let methods = [
+    InterfaceMethod<
+      /*desc=*/"",
+      "mlir::Region &", "getBranchCondition", (ins),
+      /*methodBody=*/[{}],
+      /*defaultImplementation=*/ [{
+        return $_op.getCondition();
+      }]
+    >,
+    InterfaceMethod<
+      /*desc=*/"",
+      "llvm::MutableArrayRef<mlir::Region>", "getBranchRegions", (ins),
+      /*methodBody=*/[{}],
+      /*defaultImplementation=*/ [{
+        return $_op->getRegions().drop_front(1);
+      }]
+    >,
+  ];
+}
+
 #endif
