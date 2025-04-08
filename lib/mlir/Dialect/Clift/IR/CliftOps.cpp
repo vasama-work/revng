@@ -421,14 +421,6 @@ public:
                                     /*DirectlyNested=*/false))
         return Op->emitOpError()
                << Op->getName() << " must be nested within a loop operation.";
-    } else if (auto Sym = mlir::dyn_cast<MakeLabelOp>(Op)) {
-      if (not LabelNames.insert(Sym.getName()).second)
-        return Op->emitOpError()
-               << Op->getName() << " conflicts with another label.";
-    } else if (auto Sym = mlir::dyn_cast<LocalVariableOp>(Op)) {
-      if (not LocalNames.insert(Sym.getSymName()).second)
-        return Op->emitOpError()
-               << Op->getName() << " conflicts with another local variable.";
     }
 
     return mlir::success();
@@ -443,9 +435,6 @@ public:
     if (auto F = mlir::dyn_cast<FunctionOp>(Op)) {
       FunctionReturnType = mlir::cast<ValueType>(F.getCliftFunctionType()
                                                    .getReturnType());
-
-      LocalNames.clear();
-      LabelNames.clear();
     }
 
     return mlir::success();
@@ -454,9 +443,6 @@ public:
 private:
   clift::ValueType FunctionReturnType;
   llvm::DenseMap<llvm::StringRef, DefinedType> Definitions;
-
-  llvm::DenseSet<llvm::StringRef> LocalNames;
-  llvm::DenseSet<llvm::StringRef> LabelNames;
 
   static std::optional<LoopOrSwitch> isLoopOrSwitch(Operation *Op) {
     if (mlir::isa<ForOp, DoWhileOp, WhileOp>(Op))
@@ -720,10 +706,6 @@ mlir::LogicalResult IfOp::verify() {
 //===--------------------------- LocalVariableOp --------------------------===//
 
 mlir::LogicalResult LocalVariableOp::verify() {
-  if (getSymName().empty())
-    return emitOpError() << getOperationName()
-                         << " must have a non-empty name.";
-
   if (Region &R = getInitializer(); not R.empty()) {
     if (getExpressionType(R) != getType().removeConst())
       return emitOpError() << getOperationName()
@@ -764,10 +746,6 @@ mlir::LogicalResult MakeLabelOp::canonicalize(MakeLabelOp Op,
 }
 
 mlir::LogicalResult MakeLabelOp::verify() {
-  if (getName().empty())
-    return emitOpError() << getOperationName()
-                         << " must have a non-empty name.";
-
   const auto [Assignments, GoTos] = getNumLabelUsers(*this);
 
   if (Assignments > 1)

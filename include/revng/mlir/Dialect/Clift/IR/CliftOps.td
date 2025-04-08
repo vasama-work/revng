@@ -227,6 +227,7 @@ def Clift_MakeLabelOp
   : Clift_StatementOp<"make_label",
                       [Clift_OneUseOfType<"mlir::clift::AssignLabelOp">]> {
 
+  // WIP: Remove name
   let arguments = (ins StrAttr:$name);
   let results = (outs Clift_LabelType:$result);
 
@@ -308,7 +309,7 @@ def Clift_GoToOp : Clift_StatementOp<"goto", [Clift_NoFallthrough]> {
   }];
 }
 
-def Clift_IfOp : Clift_StatementOp<"if"> {
+def Clift_IfOp : Clift_StatementOp<"if", [Clift_BranchOpInterface]> {
   let regions = (region Clift_ExpressionRegion:$condition,
                         Clift_StatementRegion:$then,
                         Clift_StatementRegion:$else);
@@ -321,6 +322,7 @@ def Clift_IfOp : Clift_StatementOp<"if"> {
 }
 
 def Clift_LocalVariableOp : Clift_StatementOp<"local"> {
+  // WIP: Remove sym_name
   let arguments = (ins StrAttr:$sym_name);
 
   let results = (outs Clift_AnyValueType:$result);
@@ -365,7 +367,7 @@ def Clift_ReturnOp : Clift_StatementOp<"return", [Clift_NoFallthrough]> {
   let hasVerifier = 1;
 }
 
-def Clift_SwitchOp : Clift_StatementOp<"switch"> {
+def Clift_SwitchOp : Clift_StatementOp<"switch", [Clift_BranchOpInterface]> {
   let arguments = (ins DenseI64ArrayAttr:$case_values);
 
   let regions = (region Clift_ExpressionRegion:$condition,
