@@ -832,6 +832,18 @@ mlir::LogicalResult GoToOp::verify() {
 
 //===-------------------------------- IfOp --------------------------------===//
 
+static bool isIndirectlyNoFallthroughImpl(BranchOpInterface Branch) {
+  for (mlir::Region &R : Branch.getBranchRegions()) {
+    if (clift::isIndirectlyNoFallthrough(R))
+      return true;
+  }
+  return false;
+}
+
+bool IfOp::isIndirectlyNoFallthrough() const {
+  return isIndirectlyNoFallthroughImpl(*this);
+}
+
 mlir::LogicalResult IfOp::verify() {
   if (not isScalarType(getExpressionType(getCondition())))
     return emitOpError() << getOperationName()
@@ -921,6 +933,10 @@ mlir::LogicalResult ReturnOp::verify() {
 }
 
 //===------------------------------ SwitchOp ------------------------------===//
+
+bool SwitchOp::isIndirectlyNoFallthrough() const {
+  return isIndirectlyNoFallthroughImpl(*this);
+}
 
 ValueType SwitchOp::getConditionType() {
   return getExpressionType(getConditionRegion());
