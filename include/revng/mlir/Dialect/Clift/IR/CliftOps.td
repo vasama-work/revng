@@ -296,6 +296,10 @@ def Clift_IfOp : Clift_StatementOp<"if", [Clift_BranchOpInterface]> {
   }];
 
   let hasVerifier = 1;
+
+  let extraClassDeclaration = [{
+    bool hasIndirectFallthrough() const;
+  }];
 }
 
 def Clift_LocalVariableOp : Clift_StatementOp<"local"> {
@@ -342,6 +346,8 @@ def Clift_SwitchOp : Clift_StatementOp<"switch", [Clift_BranchOpInterface]> {
   ];
 
   code extraClassDeclaration = [{
+    bool hasIndirectFallthrough() const;
+
     [[nodiscard]] mlir::clift::ValueType getConditionType();
 
     [[nodiscard]] Region &getConditionRegion() {
