@@ -692,6 +692,59 @@ struct OptimizedWhileConversionPattern : mlir::RewritePattern {
 };
 #endif
 
+
+struct SwitchCaseRewritePattern : mlir::OpRewritePattern<clift::SwitchOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  void initialize() { setDebugName("switch-case-rewrite"); }
+
+  mlir::LogicalResult
+  matchAndRewrite(clift::SwitchOp SwitchOp,
+                  mlir::PatternRewriter &Rewriter) const override {
+    // Reject if there is more than one case
+    if (SwitchOp.getNumCases() != 1) {
+      return Rewriter.notifyMatchFailure(SwitchOp,
+                                         "Only single-case SwitchOps can be "
+                                         "rewritten");
+    }
+
+    Rewriter.setInsertionPoint(SwitchOp);
+
+    // Create the IfOp at the position of the switchOp
+    clift::IfOp IfOp = Rewriter.create<clift::IfOp>(SwitchOp.getLoc());
+
+    // The ifOp inherits the regions of the switchOp
+    IfOp.getCondition().takeBody(SwitchOp.getCondition());
+    IfOp.getThen().takeBody(SwitchOp.getCaseRegion(0));
+    IfOp.getElse().takeBody(SwitchOp.getDefaultCaseRegion());
+
+    uint64_t CaseValue = SwitchOp.getCaseValue(0);
+
+    // Erase the switchOp
+    Rewriter.eraseOp(SwitchOp);
+
+    replaceExpression(Rewriter, IfOp.getCondition(), [&](mlir::Value Value) {
+      // Create the immediate op for the case value
+      auto CaseValueOp = Rewriter.create<clift::ImmediateOp>(IfOp.getLoc(),
+                                                             Value.getType(),
+                                                             CaseValue);
+
+      // Create a comparison op
+      auto BoolType = getBooleanType(Rewriter.getContext());
+      auto CmpOp = Rewriter.create<clift::CmpEqOp>(IfOp.getLoc(),
+                                                   BoolType,
+                                                   Value,
+                                                   CaseValueOp.getResult());
+
+      // Yield the result of the comparison
+      return CmpOp.getResult();
+    });
+
+    return mlir::success();
+  }
+};
+
+
 struct BeautifyStatementsPass
   : clift::impl::CliftBeautifyStatementsBase<BeautifyStatementsPass> {
   mlir::LogicalResult initialize(mlir::MLIRContext *Context) override {
@@ -707,6 +760,7 @@ struct BeautifyStatementsPass
     Set.add<TerminalIfElseUnwrappingPattern>(Context);
     Set.add<TrivialGotoEliminationPattern>(Context);
     Set.add<DoWhileConversionPattern>(Context);
+    Set.add<SwitchCaseRewritePattern>(Context);
 
     Patterns = mlir::FrozenRewritePatternSet(std::move(Set),
                                              disabledPatterns,
