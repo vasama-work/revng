@@ -12,6 +12,7 @@ add_mlir_dialect_library(
   Beautify/LoopDetection.cpp
   Beautify/Statements.cpp
   Beautify/ReturnConversion.cpp
+  Beautify/TightenVariableScopes.cpp
   Beautify.cpp
   CSemantics.cpp
   DEPENDS
