@@ -438,7 +438,7 @@ private:
   mlir::Value emitHelperCall(mlir::Location Loc,
                              FunctionOp Function,
                              llvm::ArrayRef<mlir::Value> Arguments) {
-    auto FunctionType = Function.getCliftFunctionType();
+    auto FunctionType = Function.getFunctionType();
 
     llvm::SmallVector<mlir::Value> CastArgs;
     CastArgs.reserve(Arguments.size());
@@ -1265,7 +1265,7 @@ private:
     } else if (auto *Return = llvm::dyn_cast<llvm::ReturnInst>(Terminal)) {
       auto Op = Builder.create<ReturnOp>(TerminalLoc);
       if (const llvm::Value *Value = Return->getReturnValue()) {
-        auto FunctionType = CurrentFunction.getCliftFunctionType();
+        auto FunctionType = CurrentFunction.getFunctionType();
 
         auto FuncReturnType = FunctionType.getReturnType();
         auto LLVMReturnType = FuncReturnType;
