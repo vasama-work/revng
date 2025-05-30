@@ -53,6 +53,9 @@ public:
   }
 };
 
+template<typename ConcreteType>
+class SideEffects : public OpTrait::TraitBase<ConcreteType, SideEffects> {};
+
 } // namespace clift
 } // namespace OpTrait
 } // namespace mlir
