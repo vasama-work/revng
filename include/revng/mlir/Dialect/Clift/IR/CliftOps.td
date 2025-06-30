@@ -687,7 +687,7 @@ def Clift_AssignOp
   let hasVerifier = 1;
 }
 
-def Clift_AccessOp : Clift_ExpressionOp<"access", [MoMemoryEffect]> {
+def Clift_AccessOp : Clift_ExpressionOp<"access", [NoMemoryEffect]> {
   let arguments = (ins Clift_AnyValueType:$value,
                        UnitAttr:$indirect,
                        I64Attr:$member_index);
