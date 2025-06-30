@@ -159,8 +159,8 @@ public:
   }
 
   template<typename RankT>
-  std::optional<std::string> getHelperFunctionName(const RankT &Rank,
-                                                   llvm::StringRef Handle) {
+  std::optional<std::string> getHelperFunctionNameImpl(const RankT &Rank,
+                                                       llvm::StringRef Handle) {
     if (auto L = pipeline::locationFromString(Rank, Handle))
       return L->at(Rank);
 
@@ -168,30 +168,33 @@ public:
   }
 
   std::optional<std::string> getHelperFunctionName(llvm::StringRef Handle) {
-    return getHelperFunctionName(revng::ranks::HelperFunction, Handle);
+    return getHelperFunctionNameImpl(revng::ranks::HelperFunction, Handle);
   }
 
   std::optional<std::string> getHelperReturnTypeName(llvm::StringRef Handle) {
-    return getHelperFunctionName(revng::ranks::HelperStructType, Handle);
+    return getHelperFunctionNameImpl(revng::ranks::HelperStructType, Handle);
+  }
+
+  template<typename RankT>
+  const model::TypeDefinition *getModelTypeDefinitionImpl(const RankT &Rank,
+                                                          DefinedType Type) {
+    if (auto L = pipeline::locationFromString(Rank, Type.getHandle())) {
+      auto It = C.Binary.TypeDefinitions().find(L->at(Rank));
+      if (It != C.Binary.TypeDefinitions().end())
+        return It->get();
+    }
+    return nullptr;
   }
 
   const model::TypeDefinition *getModelTypeDefinition(DefinedType Type) {
-    auto GetType = [&](const auto &Rank) -> const model::TypeDefinition * {
-      if (auto L = pipeline::locationFromString(Rank, Type.getHandle())) {
-        auto It = C.Binary.TypeDefinitions().find(L->at(Rank));
-        if (It != C.Binary.TypeDefinitions().end())
-          return It->get();
-      }
-      return nullptr;
-    };
+    return getModelTypeDefinitionImpl(revng::ranks::TypeDefinition, Type);
+  }
 
-    if (const auto *T = GetType(revng::ranks::TypeDefinition))
-      return T;
-
-    if (const auto *T = GetType(revng::ranks::ArtificialStruct))
-      return T;
-
-    return nullptr;
+  const model::RawFunctionDefinition *
+  getArtificialStructFunctionType(DefinedType Type) {
+    const auto *T = getModelTypeDefinitionImpl(revng::ranks::ArtificialStruct,
+                                               Type);
+    return llvm::dyn_cast_or_null<model::RawFunctionDefinition>(T);
   }
 
   void emitPrimitiveType(PrimitiveType Type) {
@@ -270,6 +273,8 @@ public:
           EmitConst(T);
           if (const auto *MT = getModelTypeDefinition(T))
             Out << C.getReferenceTag(*MT);
+          else if (const auto *MT = getArtificialStructFunctionType(T))
+            Out << getReturnStructTypeReferenceTag(C.NameBuilder.name(*MT), C);
           else if (auto Name = getHelperReturnTypeName(T.getHandle()))
             Out << getReturnStructTypeReferenceTag(*Name, C);
           else
@@ -602,14 +607,14 @@ public:
         emitClassMemberReference(*T, E.getFieldAttr().getOffset());
       else if (auto *T = llvm::dyn_cast<model::UnionDefinition>(MT))
         emitClassMemberReference(*T, E.getMemberIndex());
-      else if (auto *T = llvm::dyn_cast<model::RawFunctionDefinition>(MT))
-        emitRawFunctionRegisterReference(*T, E.getMemberIndex());
       else
         revng_abort("Unexpected model type in access expression.");
+    } else if (const auto *T = getArtificialStructFunctionType(Class)) {
+      emitRawFunctionRegisterReference(*T, E.getMemberIndex());
     } else if (auto Name = getHelperReturnTypeName(Class.getHandle())) {
       Out << getReturnStructFieldReferenceTag(*Name,
-                                                   E.getMemberIndex(),
-                                                   C);
+                                              E.getMemberIndex(),
+                                              C);
     } else {
       revng_abort("Unrecognized class type handle");
     }

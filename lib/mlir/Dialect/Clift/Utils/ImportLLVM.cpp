@@ -295,7 +295,7 @@ private:
   }
 
   clift::FunctionOp emitModelFunctionDeclaration(const llvm::Function *F,
-                                                    const model::Function *MF) {
+                                                 const model::Function *MF) {
     auto FunctionType = importModelType<clift::FunctionType>(*MF->Prototype());
 
     auto Op = Builder.create<FunctionOp>(getLocation(F->getSubprogram()),
@@ -461,15 +461,43 @@ private:
                              mlir::Type ReturnType,
                              llvm::ArrayRef<mlir::Type> ParameterTypes,
                              llvm::ArrayRef<mlir::Value> Arguments) {
+    auto Handle = pipeline::locationString(revng::ranks::HelperFunction,
+                                           HelperName.str());
+
     auto FunctionType = clift::FunctionType::get(Context,
-                                                 "",
-                                                 "",
+                                                 Handle,
+                                                 /*Name=*/"",
                                                  ReturnType,
                                                  ParameterTypes);
 
     return emitHelperCall(Loc,
                           getHelperFunction(HelperName, FunctionType),
                           Arguments);
+  }
+
+  RecursiveCoroutine<mlir::Value>
+  emitStructInitializer(const llvm::CallInst *Call) {
+    mlir::Location Loc = getLocation(Call);
+
+    auto UseBegin = Call->use_begin();
+    auto UseEnd = Call->use_end();
+    revng_assert(UseBegin != UseEnd);
+
+    // StructInitializer must have exactly one user of type ReturnInst.
+    revng_assert(llvm::isa<llvm::ReturnInst>(UseBegin->getUser()));
+    revng_assert(std::next(UseBegin) == UseEnd);
+
+    auto T = mlir::dyn_cast<StructType>(CurrentFunction.getCliftReturnType());
+    revng_assert(Call->arg_size() == T.getFields().size());
+
+    llvm::SmallVector<mlir::Value> Initializers;
+    for (const auto &[A, F] : llvm::zip(Call->args(), T.getFields())) {
+      mlir::Value Value = rc_recur emitExpression(A, Loc);
+      Value = emitImplicitCast(Loc, Value, F.getType());
+      Initializers.push_back(Value);
+    }
+
+    rc_return Builder.create<AggregateOp>(Loc, T, Initializers);
   }
 
   RecursiveCoroutine<mlir::Value>
@@ -491,9 +519,11 @@ private:
                                        Index);
   }
 
-  RecursiveCoroutine<mlir::Value> emitHelperCall(const llvm::CallInst *Call) {
-    const llvm::Function *Function = Call->getCalledFunction();
-    auto Tags = FunctionTags::TagsSet::from(Function);
+  RecursiveCoroutine<mlir::Value> emitHelperCall(const llvm::CallInst *Call,
+                                                 const llvm::Function *Callee,
+                                                 const FunctionTags::TagsSet &Tags) {
+    if (Tags.contains(FunctionTags::StructInitializer))
+      rc_return rc_recur emitStructInitializer(Call);
 
     if (Tags.contains(FunctionTags::OpaqueExtractValue))
       rc_return rc_recur emitOpaqueExtractValue(Call);
@@ -506,7 +536,7 @@ private:
     for (const llvm::Value *Argument : Call->args())
       Arguments.push_back(rc_recur emitExpression(Argument, Loc));
 
-    rc_return emitHelperCall(Loc, getHelperFunction(Function), Arguments);
+    rc_return emitHelperCall(Loc, getHelperFunction(Callee), Arguments);
   }
 
   struct StringLiteral {
@@ -971,8 +1001,11 @@ private:
 
       mlir::Location Loc = getLocation(I);
 
+      const llvm::Function *Callee = I->getCalledFunction();
+      auto Tags = FunctionTags::TagsSet::from(Callee);
+
       if (not I->hasMetadata(PrototypeMDName))
-        rc_return emitHelperCall(I);
+        rc_return emitHelperCall(I, Callee, Tags);
 
       const auto *ModelCallType = getCallSitePrototype(Model, I);
       auto Layout = abi::FunctionType::Layout::make(*ModelCallType);
@@ -1347,15 +1380,17 @@ private:
     mlir::Location TerminalLoc = getLocation(Terminal);
 
     if (llvm::isa<llvm::UnreachableInst>(Terminal)) {
+#if 0
       auto Op = Builder.create<ExpressionStatementOp>(TerminalLoc);
 
       emitExpressionTreeImpl(Op.getExpression(), [&]() {
         return emitHelperCall(TerminalLoc,
                               "llvm.unreachable",
                               getVoidType(),
-                              /*ParameterTypes=*/ {},
+                              /*ParameterTypes=*/{},
                               /*Arguments=*/{});
       });
+#endif
     } else if (auto *Return = llvm::dyn_cast<llvm::ReturnInst>(Terminal)) {
       auto Op = Builder.create<ReturnOp>(TerminalLoc);
       if (const llvm::Value *Value = Return->getReturnValue()) {
@@ -1519,9 +1554,6 @@ private:
   }
 
   void importFunction(const llvm::Function *F) {
-    if (F->getName() == "llvm.unreachable")
-      revng_abort("Encountered function with name llvm.unreachable");
-
     const model::Function *MF = llvmToModelFunction(Model, *F);
     if (MF == nullptr)
       return;
