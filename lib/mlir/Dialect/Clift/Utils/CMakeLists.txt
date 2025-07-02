@@ -3,7 +3,8 @@
 #
 
 revng_add_library_internal(MLIRCliftUtils SHARED CBackend.cpp CSemantics.cpp
-                           ImportLLVM.cpp ImportModel.cpp ModelVerify.cpp)
+                           ImportLLVM.cpp ImportModel.cpp ModelVerify.cpp
+                           Legalization.cpp)
 
 target_link_libraries(
   MLIRCliftUtils
@@ -14,4 +15,5 @@ target_link_libraries(
          revngPTML
          revngTypeNames
          revngRestructureCFG
-         revngLocalVariables)
+         revngLocalVariables
+         revngValueMaterializer)

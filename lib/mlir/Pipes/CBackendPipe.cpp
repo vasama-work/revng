@@ -51,10 +51,17 @@ public:
     mlir::ModuleOp Module = CliftContainer.getModule();
     // WIP: revng_assert(verifyCSemantics(Module, Target).succeeded());
 
+    const auto &Model = *revng::getModelFromContext(EC);
+    uint64_t ExplicitTargetPointerSize = getPointerSize(Model.Architecture());
+    if (ExplicitTargetPointerSize == 8) // Hardcoded 64.
+      ExplicitTargetPointerSize = 0;
+
     llvm::raw_null_ostream NullStream;
-    ptml::CTypeBuilder B(NullStream,
-                         *getModelFromContext(EC),
-                         /*EnableTaglessMode=*/true);
+    ptml::CTypeBuilder
+      B(NullStream,
+        Model,
+        /*EnableTaglessMode=*/true,
+        { .ExplicitTargetPointerSize = ExplicitTargetPointerSize });
 
     std::unordered_map<MetaAddress, clift::FunctionOp> Functions;
     Module->walk([&](clift::FunctionOp F) {

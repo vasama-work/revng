@@ -17,6 +17,9 @@
 #include "revng/mlir/Dialect/Clift/Utils/ImportLLVM.h"
 #include "revng/mlir/Dialect/Clift/Utils/ImportModel.h"
 
+// WIP:
+#include "revng/ValueMaterializer/DataFlowGraph.h"
+
 namespace clift = mlir::clift;
 using namespace clift;
 
@@ -68,6 +71,19 @@ static mlir::OwningOpRef<OpT> createOperation(mlir::MLIRContext *Context,
 using ScopeGraphPostDomTree = llvm::PostDomTreeOnView<llvm::BasicBlock, Scope>;
 
 class LLVMCodeImporter {
+#if 0
+  // WIP: DEBUG
+
+  struct DebugI {
+    size_t C;
+    size_t N;
+    size_t K;
+  };
+
+  bool DebugInstructions = false;
+  std::unordered_map<const llvm::Value *, DebugI> DebugInstructionCounter;
+#endif
+
 public:
   static void import(mlir::ModuleOp ModuleOp,
                      const model::Binary &Model,
@@ -113,9 +129,13 @@ private:
   /* Type utilities */
 
   static uint64_t getIntegerSize(unsigned IntegerWidth) {
-    // Compute the smallest power-of-two number of bytes capable of representing
-    // the type based on its bit width:
-    return std::bit_ceil((IntegerWidth + 7) / 8);
+    if (IntegerWidth == 1)
+      IntegerWidth = 8;
+
+    revng_check(IntegerWidth % 8 == 0);
+
+    // Convert the size in bits to a size in octets:
+    return IntegerWidth / 8;
   }
 
   clift::ValueType
@@ -144,6 +164,13 @@ private:
     if (not IntptrTypeCache)
       IntptrTypeCache = getPrimitiveType(PointerSize);
     return IntptrTypeCache;
+  }
+
+  template<typename FunctionT>
+  model::UpcastableType getPrototype(const FunctionT &Function) {
+    if (auto &&Type = Function.Prototype())
+      return Type;
+    return Model.makeType(Model.defaultPrototype()->key());
   }
 
   /* Model type import */
@@ -295,23 +322,42 @@ private:
   }
 
   clift::FunctionOp emitModelFunctionDeclaration(const llvm::Function *F,
-                                                 const model::Function *MF) {
-    auto FunctionType = importModelType<clift::FunctionType>(*MF->Prototype());
+                                                 const model::Type &Type) {
+    auto FunctionType = importModelType<clift::FunctionType>(Type);
+    return Builder.create<FunctionOp>(getLocation(F->getSubprogram()),
+                                      F->getName(),
+                                      FunctionType);
+  }
 
-    auto Op = Builder.create<FunctionOp>(getLocation(F->getSubprogram()),
-                                         F->getName(),
-                                         FunctionType);
-
+  clift::FunctionOp emitIsolatedFunctionDeclaration(const llvm::Function *F,
+                                                    const model::Function *MF) {
+    auto Op = emitModelFunctionDeclaration(F, *getPrototype(*MF));
     Op.setHandle(pipeline::locationString(revng::ranks::Function, MF->Entry()));
+    return Op;
+  }
 
+  clift::FunctionOp emitImportedFunctionDeclaration(const llvm::Function *F) {
+    llvm::StringRef Name = F->getName();
+    revng_check(Name.consume_front("dynamic_"));
+
+    auto It = Model.ImportedDynamicFunctions().find(Name.str());
+    revng_check(It != Model.ImportedDynamicFunctions().end());
+
+    auto Op = emitModelFunctionDeclaration(F, *getPrototype(*It));
+    Op.setHandle(pipeline::locationString(revng::ranks::DynamicFunction,
+                                          It->Name()));
     return Op;
   }
 
   clift::FunctionOp emitFunctionDeclaration(const llvm::Function *F) {
     if (const model::Function *MF = llvmToModelFunction(Model, *F))
-      return emitModelFunctionDeclaration(F, MF);
-    else
-      return emitHelperDeclaration(F);
+      return emitIsolatedFunctionDeclaration(F, MF);
+
+    auto Tags = FunctionTags::TagsSet::from(F);
+    if (Tags.contains(FunctionTags::DynamicFunction))
+      return emitImportedFunctionDeclaration(F);
+
+    return emitHelperDeclaration(F);
   }
 
   auto getOrEmitSymbol(const llvm::GlobalObject *G, auto Emit) {
@@ -330,7 +376,6 @@ private:
       if (auto *F = llvm::dyn_cast<llvm::Function>(G))
         return emitFunctionDeclaration(F);
 
-      llvm::errs() << "G: " << *G << "\n";
       revng_abort("Unsupported global object kind");
     });
 
@@ -380,8 +425,6 @@ private:
                             std::same_as<mlir::Value> auto... Operands) {
     auto ConvertToKind = [&](mlir::Value &Value, PrimitiveKind Kind) {
       auto UnderlyingType = getUnderlyingIntegerType(Value.getType());
-      if (not UnderlyingType)
-        llvm::errs() << Value.getType() << "\n";
       revng_assert(UnderlyingType);
 
       uint64_t Size = UnderlyingType.getSize();
@@ -519,9 +562,12 @@ private:
                                        Index);
   }
 
-  RecursiveCoroutine<mlir::Value> emitHelperCall(const llvm::CallInst *Call,
-                                                 const llvm::Function *Callee,
-                                                 const FunctionTags::TagsSet &Tags) {
+  RecursiveCoroutine<mlir::Value> emitHelperCall(const llvm::CallInst *Call) {
+    const llvm::Function *Callee = Call->getCalledFunction();
+    revng_assert(Callee != nullptr);
+
+    auto Tags = FunctionTags::TagsSet::from(Callee);
+
     if (Tags.contains(FunctionTags::StructInitializer))
       rc_return rc_recur emitStructInitializer(Call);
 
@@ -608,6 +654,20 @@ private:
   RecursiveCoroutine<mlir::Value>
   emitExpression(const llvm::Value *V, mlir::Location SurroundingLocation) {
     LoggerIndent Indent(ExpressionLog);
+
+#if 0
+    if (DebugInstructions) {
+      auto [I, B] = DebugInstructionCounter.try_emplace(V, DebugI{ 1, 10 });
+      if (B) {
+        llvm::errs() << V << ": 1 (" << *V << ")\n";
+      } else {
+        if (++I->second.C == I->second.N) {
+          I->second.N *= 10;
+          llvm::errs() << V << ": " << I->second.C << "\n";
+        }
+      }
+    }
+#endif
 
     if (auto G = llvm::dyn_cast<llvm::GlobalObject>(V)) {
       if (const StringLiteral *String = detectStringLiteral(G)) {
@@ -1001,11 +1061,8 @@ private:
 
       mlir::Location Loc = getLocation(I);
 
-      const llvm::Function *Callee = I->getCalledFunction();
-      auto Tags = FunctionTags::TagsSet::from(Callee);
-
       if (not I->hasMetadata(PrototypeMDName))
-        rc_return emitHelperCall(I, Callee, Tags);
+        rc_return emitHelperCall(I);
 
       const auto *ModelCallType = getCallSitePrototype(Model, I);
       auto Layout = abi::FunctionType::Layout::make(*ModelCallType);
@@ -1251,6 +1308,19 @@ private:
     revng_log(BasicBlockLog, "BB: '" << BB->getName() << "'");
     LoggerIndent Indent(BasicBlockLog);
 
+#if 0
+    auto StartTime = std::chrono::steady_clock::now();
+    if (BB->getName() == "bb.0x2aeac:Code_arm_L1_cloned")
+      DebugInstructions = true;
+    auto EEE = llvm::make_scope_exit([&]() {
+      auto EndTime = std::chrono::steady_clock::now();
+      auto Duration = EndTime - StartTime;
+      llvm::errs() << "Took: " << std::chrono::duration_cast<std::chrono::milliseconds>(Duration).count() << " ms\n";
+      if (BB->getName() == "bb.0x2aeac:Code_arm_L1_cloned")
+        DebugInstructions = false;
+    });
+#endif
+
     // Map BB to the MLIR block, emit label if necessary:
     {
       auto [Iterator, Inserted] = BlockMapping.try_emplace(BB);
@@ -1270,6 +1340,22 @@ private:
     for (const llvm::Instruction &I : *BB) {
       if (&I == Terminal)
         break;
+
+      #if 0
+      {
+        std::string S;
+        {
+          llvm::raw_string_ostream O(S);
+          O << I;
+        }
+        llvm::errs() << "'" << S << "'\n";
+        if (S == "  store i32 %r3.32, ptr %8, align 4, !dbg !5205") {
+          llvm::errs() << "Start data flow\n";
+          DataFlowGraph::fromValue(const_cast<llvm::Instruction *>(&I), {}).dump();
+          llvm::errs() << "End data flow\n";
+        }
+      }
+      #endif
 
       if (auto *Alloca = llvm::dyn_cast<llvm::AllocaInst>(&I)) {
         const auto *Size = Alloca->getArraySize();
@@ -1339,17 +1425,17 @@ private:
         auto Op = Builder.create<ExpressionStatementOp>(Loc);
         emitExpressionTree(Op.getExpression(), &I, Loc);
       }
+#if 1
+      else if (not llvm::isa<llvm::ArrayType>(I.getType())
+               and (I.hasNUsesOrMore(2) or isUsedOutsideOfBlock(&I, BB))) {
+        mlir::Location Loc = getLocation(&I);
 
-#if 0
-      else if (I.hasNUsesOrMore(2) or isUsedOutsideOfBlock(&I, BB)) {
         mlir::Region R;
-        mlir::Type Type = emitExpressionTree(&I, R);
+        mlir::Type Type = emitExpressionTree(R, &I, Loc);
 
         // Any instruction with more than one use, or with a single use outside
         // of this block must be emitted into a local variable initializer.
-        auto Op = Builder.create<LocalVariableOp>(mlir::UnknownLoc::get(Context),
-                                                  Type,
-                                                  "");
+        auto Op = Builder.create<LocalVariableOp>(Loc, Type);
 
         // Move the local block into the initializer region.
         Op.getInitializer().push_back(R.getBlocks().remove(R.front()));
@@ -1562,7 +1648,7 @@ private:
     LoggerIndent Indent(BasicBlockLog);
 
     auto Op = getOrEmitSymbol(F, [&]() -> FunctionOp {
-      return emitModelFunctionDeclaration(F, MF);
+      return emitIsolatedFunctionDeclaration(F, MF);
     });
 
     revng_assert(Op.getArgumentTypes().size() == F->arg_size());
@@ -1571,7 +1657,7 @@ private:
     mlir::Block &BodyBlock = Op.getBody().emplaceBlock();
 
     CurrentFunction = Op;
-    CurrentLayout = abi::FunctionType::Layout::make(*MF->Prototype());
+    CurrentLayout = abi::FunctionType::Layout::make(*getPrototype(*MF));
 
     LocalDeclarationInsertPoint = makeInsertionPointAfterStart(&BodyBlock);
 

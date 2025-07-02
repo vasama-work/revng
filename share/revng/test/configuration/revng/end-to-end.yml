@@ -149,7 +149,7 @@ commands:
       - type: revng.analyzed-model
     suffix: /
     command: |-
-      WORKDIR="$OUTPUT/emit-c";
+      WORKDIR="$OUTPUT/check-emit-c";
       mkdir -p "$$WORKDIR";
 
       revng artifact
@@ -179,3 +179,26 @@ commands:
 
       revng check-decompiled-c "$$WORKDIR/decompiled.c" -I"$$WORKDIR" -m${POINTER_SIZE}
         2> "$$WORKDIR/check-decompiled-c.log";
+
+#      revng artifact
+#        --model "$INPUT2"
+#        --resume "$OUTPUT"
+#        prepare-for-clift
+#        "$INPUT1"
+#        > "$$WORKDIR/test.bc.zstd";
+#
+#      revng pipe
+#        llvm-to-clift
+#        "$INPUT2"
+#        "$$WORKDIR/test.bc.zstd"
+#        /dev/null
+#        /dev/stdout
+#        > "$$WORKDIR/test.mlir";
+#
+#      revng pipe
+#        emit-c
+#        "$INPUT2"
+#        "$$WORKDIR/test.mlir"
+#        <(tar -czT /dev/null)
+#        /dev/stdout
+#      | tar -zxO > "$$WORKDIR/decompiled.h";

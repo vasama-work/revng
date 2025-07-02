@@ -56,6 +56,8 @@ public:
     /// printed with every struct definition.
     bool EnableStructSizeAnnotation = false;
 
+    uint64_t ExplicitTargetPointerSize = 0;
+
     /// Sometimes you don't want to print everything. This lets you specify
     /// a set of types that will be ignored by \ref typeDefinitions.
     std::set<model::TypeDefinition::Key> TypesToOmit = {};

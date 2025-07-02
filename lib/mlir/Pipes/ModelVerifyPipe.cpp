@@ -2,8 +2,6 @@
 // This file is distributed under the MIT License. See LICENSE.md for details.
 //
 
-#pragma clang optimize off
-
 #include "revng/mlir/Dialect/Clift/Utils/ModelVerify.h"
 #include "revng/mlir/Pipes/CliftContainer.h"
 #include "revng/Pipeline/RegisterPipe.h"

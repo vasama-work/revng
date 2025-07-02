@@ -4,6 +4,9 @@
 
 #include <unordered_map>
 
+#include "revng/Pipeline/RegisterPipe.h"
+#include "revng/Pipes/Kinds.h"
+#include "revng/mlir/Dialect/Clift/Utils/Helpers.h"
 #include "revng/mlir/Dialect/Clift/Utils/Legalization.h"
 #include "revng/mlir/Pipes/CliftContainer.h"
 
@@ -14,7 +17,7 @@ namespace {
 
 class CBackendPipe {
 public:
-  static constexpr auto Name = "emit-c";
+  static constexpr auto Name = "clift-legalization";
 
   std::array<pipeline::ContractGroup, 1> getContract() const {
     using namespace pipeline;
@@ -22,8 +25,8 @@ public:
 
     return { ContractGroup({ Contract(MLIRFunctionKind,
                                       0,
-                                      Decompiled,
-                                      1,
+                                      MLIRFunctionKind,
+                                      0,
                                       InputPreservation::Preserve) }) };
   }
 
@@ -58,7 +61,7 @@ public:
       revng_check(It != Functions.end()
                   and "Requested Clift function not found");
 
-      legalizeForC()
+      revng_check(legalizeForC(It->second, Target).succeeded());
     }
   }
 };

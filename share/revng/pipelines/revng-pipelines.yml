@@ -717,6 +717,19 @@ Branches:
             input program.
   - From: llvm-to-clift
     Steps:
+      - Name: clift-legalization
+        Pipes:
+          - Type: clift-legalization
+            UsedContainers: [module.mlir]
+        Artifacts:
+          Container: module.mlir
+          Kind: mlir-module
+          SingleTargetFilename: clift_legalization.mlir
+          Docs: |-
+            This artifact contains a legalized Clift function for each function
+            in the input program.
+  - From: clift-legalization
+    Steps:
       - Name: emit-c
         Pipes:
           - Type: emit-c
