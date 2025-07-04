@@ -158,3 +158,44 @@ commands:
     suffix: /
     command: |-
       revng artifact --model "$INPUT2" --resume "$OUTPUT" prepare-for-clift "$INPUT1" -o /dev/null
+
+  #
+  # Produce the emit-c artifact and check the resulting C code
+  #
+  - type: revng.emit-c
+    from:
+      - type: revng-qa.compiled
+        filter: one-per-architecture
+      - type: revng.analyzed-model
+    suffix: /
+    command: |-
+      WORKDIR="$OUTPUT/check-emit-c";
+      mkdir -p "$$WORKDIR";
+
+      revng artifact
+        --model "$INPUT2"
+        --resume "$OUTPUT"
+        emit-helpers-header
+        "$INPUT1"
+      | revng ptml > "$$WORKDIR/helpers.h";
+
+      revng artifact
+        --model "$INPUT2"
+        --resume "$OUTPUT"
+        emit-model-header
+        "$INPUT1"
+      | revng ptml > "$$WORKDIR/types-and-globals.h";
+
+      revng artifact
+        --model "$INPUT2"
+        --resume "$OUTPUT"
+        emit-c
+        "$INPUT1"
+      | tar -zxO > "$$WORKDIR/decompiled.h";
+
+      echo "#include \"helpers.h\"" > "$$WORKDIR/decompiled.c";
+      echo "#include \"types-and-globals.h\"" >> "$$WORKDIR/decompiled.c";
+      echo "#include \"decompiled.h\"" >> "$$WORKDIR/decompiled.c";
+
+      revng check-decompiled-c "$$WORKDIR/decompiled.c" -I"$$WORKDIR" -m${POINTER_SIZE}
+        2> "$$WORKDIR/check-decompiled-c.log";

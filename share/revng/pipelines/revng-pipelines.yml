@@ -728,6 +728,19 @@ Branches:
           Docs: |-
             This artifact contains a legalized Clift function for each function
             in the input program.
+  - From: clift-legalization
+    Steps:
+      - Name: emit-c
+        Pipes:
+          - Type: emit-c
+            UsedContainers: [module.mlir, decompiled.tar.gz]
+        Artifacts:
+          Container: decompiled.tar.gz
+          Kind: decompiled
+          SingleTargetFilename: decompiled.c
+          Docs: |-
+            This artifact contains a C function for each function in the input
+            program.
 AnalysesLists:
   - Name: revng-initial-auto-analysis
     Analyses:

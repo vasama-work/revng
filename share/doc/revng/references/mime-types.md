@@ -29,6 +29,7 @@ USAGE: revng-artifact [options] <artifact> <binary>
   prepare-for-clift           - application/x.llvm.bc+zstd
   llvm-to-clift               - application/x.mlir.bc
   clift-legalization          - application/x.mlir.bc
+  emit-c                      - text/x.c+ptml+tar+gz
 ```
 
 ## MIME types
