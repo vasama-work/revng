@@ -48,13 +48,24 @@ public:
     if (ErrorCode)
       revng_abort(ErrorCode.message().c_str());
 
+    const auto &Model = *revng::getModelFromContext(EC);
+
+    auto Arch = Model.Architecture();
+    uint64_t ExplicitTargetPointerSize = Arch == model::Architecture::Invalid ?
+                                           0 :
+                                           getPointerSize(Arch);
+
+    if (ExplicitTargetPointerSize == 8) // Hardcoded 64, same as in Clift.
+      ExplicitTargetPointerSize = 0;
+
     namespace options = revng::options;
     ptml::CTypeBuilder
       B(Header,
-        *getModelFromContext(EC),
+        Model,
         /* EnableTaglessMode = */ false,
         { .EnableStackFrameInlining = options::EnableStackFrameInlining,
-          .EnablePrintingOfTheMaximumEnumValue = true });
+          .EnablePrintingOfTheMaximumEnumValue = true,
+          .ExplicitTargetPointerSize = ExplicitTargetPointerSize });
     ptml::HeaderBuilder(B).printModelHeader();
 
     Header.flush();

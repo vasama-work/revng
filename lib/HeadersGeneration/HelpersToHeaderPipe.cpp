@@ -44,7 +44,21 @@ public:
     if (ErrorCode)
       revng_abort(ErrorCode.message().c_str());
 
-    ptml::CTypeBuilder B(Header, *revng::getModelFromContext(EC));
+    const auto &Model = *revng::getModelFromContext(EC);
+
+    auto Arch = Model.Architecture();
+    uint64_t ExplicitTargetPointerSize = Arch == model::Architecture::Invalid ?
+                                           0 :
+                                           getPointerSize(Arch);
+
+    if (ExplicitTargetPointerSize == 8) // Hardcoded 64, same as in Clift.
+      ExplicitTargetPointerSize = 0;
+
+    ptml::CTypeBuilder
+      B(Header,
+        Model,
+        /* EnableTaglessMode = */ false,
+        { .ExplicitTargetPointerSize = ExplicitTargetPointerSize });
     ptml::HeaderBuilder(B).printHelpersHeader(IRContainer.getModule());
     Header.flush();
     ErrorCode = Header.error();
