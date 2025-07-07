@@ -715,6 +715,19 @@ Branches:
           Docs: |-
             This artifact contains a Clift function for each function in the
             input program.
+  - From: llvm-to-clift
+    Steps:
+      - Name: clift-legalization
+        Pipes:
+          - Type: clift-legalization
+            UsedContainers: [module.mlir]
+        Artifacts:
+          Container: module.mlir
+          Kind: mlir-module
+          SingleTargetFilename: clift_legalization.mlir
+          Docs: |-
+            This artifact contains a legalized Clift function for each function
+            in the input program.
 AnalysesLists:
   - Name: revng-initial-auto-analysis
     Analyses:

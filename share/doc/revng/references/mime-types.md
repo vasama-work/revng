@@ -28,6 +28,7 @@ USAGE: revng-artifact [options] <artifact> <binary>
   cleanup-ir                  - application/x.llvm.bc+zstd
   prepare-for-clift           - application/x.llvm.bc+zstd
   llvm-to-clift               - application/x.mlir.bc
+  clift-legalization          - application/x.mlir.bc
 ```
 
 ## MIME types
