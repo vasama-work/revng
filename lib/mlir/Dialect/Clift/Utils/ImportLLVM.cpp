@@ -1345,25 +1345,6 @@ private:
         auto Op = Builder.create<ExpressionStatementOp>(Loc);
         emitExpressionTree(Op.getExpression(), &I, Loc);
       }
-      // TODO: Apply the patch from fez instead:
-      else if (not llvm::isa<llvm::ArrayType>(I.getType())
-               and (I.hasNUsesOrMore(2) or isUsedOutsideOfBlock(&I, BB))) {
-        mlir::Location Loc = getLocation(&I);
-
-        mlir::Region R;
-        mlir::Type Type = emitExpressionTree(R, &I, Loc);
-
-        // Any instruction with more than one use, or with a single use outside
-        // of this block must be emitted into a local variable initializer.
-        auto Op = Builder.create<LocalVariableOp>(Loc, Type);
-
-        // Move the local block into the initializer region.
-        Op.getInitializer().push_back(R.getBlocks().remove(R.front()));
-
-        // Map this instruction value to the newly created local variable.
-        auto [It, Inserted] = ValueMapping.try_emplace(&I, Op);
-        revng_assert(Inserted);
-      }
     }
 
     if (Terminal->getNumSuccessors() == 1) {
