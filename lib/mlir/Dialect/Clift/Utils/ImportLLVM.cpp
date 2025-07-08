@@ -558,6 +558,9 @@ private:
       llvm::dyn_cast<llvm::Function>(Call->getCalledOperand());
     revng_assert(Callee != nullptr);
 
+    if (Call->getCalledFunction() == nullptr)
+      revng_abort("mismatched helper call signature");
+
     auto Tags = FunctionTags::TagsSet::from(Callee);
 
     if (Tags.contains(FunctionTags::StructInitializer))
