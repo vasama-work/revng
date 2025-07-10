@@ -61,6 +61,11 @@ def CliftImmediateRadixDeduction : Clift_Pass<"deduce-immediate-radices",
   let constructor = "mlir::clift::createImmediateRadixDeductionPass()";
 }
 
+def CliftTightenVariableScopes : Clift_Pass<"tighten-variable-scopes", "clift::FunctionOp"> {
+  let summary = "Tighten variable scopes";
+  let constructor = "mlir::clift::createTightenVariableScopePass()";
+}
+
 def CliftVerifyC : Clift_Pass<"verify-c", "mlir::ModuleOp"> {
   let summary = "Verify that the Clift semantics correspond to C semantics " #
                 "in the specified target implementation.";

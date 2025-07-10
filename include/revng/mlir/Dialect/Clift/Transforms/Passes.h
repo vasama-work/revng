@@ -28,6 +28,8 @@ PassPtr<clift::FunctionOp> createImmediateRadixDeductionPass();
 
 PassPtr<mlir::ModuleOp> createVerifyCPass();
 
+PassPtr<clift::FunctionOp> createTightenVariableScopePass();
+
 #define GEN_PASS_REGISTRATION
 #include "revng/mlir/Dialect/Clift/Transforms/Passes.h.inc"
 
