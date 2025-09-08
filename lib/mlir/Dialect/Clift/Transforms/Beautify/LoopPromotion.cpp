@@ -1,6 +1,5 @@
-//
-// This file is distributed under the MIT License. See LICENSE.md for details.
-//
+#include "revng/Support/Debug.h"
+#pragma clang optimize off
 
 #include "mlir/Pass/Pass.h"
 
@@ -10,7 +9,7 @@
 
 namespace mlir {
 namespace clift {
-#define GEN_PASS_DEF_CLIFTLOOPDETECTION
+#define GEN_PASS_DEF_CLIFTLOOPPROMOTION
 #include "revng/mlir/Dialect/Clift/Transforms/Passes.h.inc"
 } // namespace clift
 } // namespace mlir
@@ -144,38 +143,13 @@ static void createLoop(clift::FunctionOp Function,
     for (clift::GoToOp Goto : Gotos)
       Goto.setOperand(ContinueLabel);
   }
-
-#if 0
-  for (clift::GoToOp Goto : Gotos) {
-    mlir::Operation *Op = Goto.getOperation();
-
-    while (Op->getBlock() != InnerBlock) {
-      mlir::Region *ParentRegion = Op->getParentRegion();
-      mlir::Operation *ParentOp = ParentRegion->getParentOp();
-
-      if (auto Branch = mlir::dyn_cast<clift::BranchOpInterface>(ParentOp)) {
-        for (mlir::Region &R : Branch.getBranchRegions()) {
-          if (&R == ParentRegion)
-            continue;
-
-          if (clift::getTrailingJumpOp(R))
-            continue;
-
-          if (R.empty())
-            R.emplaceBlock();
-
-          Builder.setInsertionPointToEnd(&R.front());
-          Builder.create<clift::GoToOp>(LoopLoc, BreakLabel);
-        }
-      }
-
-      Op = ParentOp;
-    }
-  }
-#endif
 }
 
-static void createLoops(clift::FunctionOp Function) {
+static void inspectLoops(clift::FunctionOp Function) {
+  if (Function.getName().startswith("local_0x400920")) {
+    dbg << "HERE\n";
+  }
+
   llvm::SmallVector<std::pair<clift::AssignLabelOp, size_t>> LoopLabels;
   llvm::SmallVector<clift::GoToOp> LoopGotos;
 
@@ -192,18 +166,18 @@ static void createLoops(clift::FunctionOp Function) {
   }
 }
 
-struct LoopDetectionPass
-  : clift::impl::CliftLoopDetectionBase<LoopDetectionPass> {
+struct LoopPromotionPass
+  : clift::impl::CliftLoopPromotionBase<LoopPromotionPass> {
 
   void runOnOperation() override {
     getOperation()->walk([](clift::FunctionOp Function) {
-      createLoops(Function);
+      inspectLoops(Function);
     });
   }
 };
 
 } // namespace
 
-clift::PassPtr<clift::FunctionOp> clift::createLoopDetectionPass() {
-  return std::make_unique<LoopDetectionPass>();
+clift::PassPtr<clift::FunctionOp> clift::createLoopPromotionPass() {
+  return std::make_unique<LoopPromotionPass>();
 }
