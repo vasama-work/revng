@@ -65,6 +65,14 @@ extern generic128_t undef_generic128_t();
 #endif
 
 //
+// Pointer
+//
+
+extern generic16_t undef_pointer16_t();
+extern generic32_t undef_pointer32_t();
+extern generic64_t undef_pointer64_t();
+
+//
 // PointerOrNumber
 //
 

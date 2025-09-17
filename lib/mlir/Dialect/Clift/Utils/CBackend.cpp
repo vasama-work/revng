@@ -477,10 +477,19 @@ public:
   //===---------------------------- Expressions ---------------------------===//
 
   RecursiveCoroutine<void> emitUndefExpression(mlir::Value V) {
-    auto T = mlir::cast<clift::PrimitiveType>(V.getType());
-    Out << C.Binary.Configuration().Naming().undefinedValuePrefix().str()
-        << getPrimitiveTypeCName(T) << "()";
-    rc_return;
+    if (auto T = mlir::dyn_cast<clift::PrimitiveType>(V.getType())) {
+      Out << C.Binary.Configuration().Naming().undefinedValuePrefix().str()
+          << getPrimitiveTypeCName(T) << "()";
+    } else if (auto T = mlir::dyn_cast<clift::PointerType>(V.getType())) {
+      Out << "(";
+      rc_recur emitType(T);
+      Out << ")";
+
+      Out << C.Binary.Configuration().Naming().undefinedValuePrefix().str()
+          << "pointer" << (T.getPointerSize() * 8) << "_t()";
+    } else {
+      revng_abort("Unsupported undef expression");
+    }
   }
 
   RecursiveCoroutine<void> emitImmediateExpression(mlir::Value V) {
