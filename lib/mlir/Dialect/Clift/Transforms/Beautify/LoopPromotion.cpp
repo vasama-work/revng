@@ -171,6 +171,9 @@ void mlir::clift::inspectLoops(clift::FunctionOp Function) {
     }
   });
 
+  std::reverse(LoopLabels.begin(), LoopLabels.end());
+  std::reverse(LoopGotos.begin(), LoopGotos.end());
+
   for (size_t GotoIndex = 0; auto &[Label, GotoCount] : LoopLabels) {
     size_t I = std::exchange(GotoIndex, GotoIndex + GotoCount);
     createLoop(Function, Label, llvm::ArrayRef(LoopGotos).slice(I, GotoCount));
