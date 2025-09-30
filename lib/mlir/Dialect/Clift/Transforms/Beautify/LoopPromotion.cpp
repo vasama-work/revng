@@ -6,6 +6,7 @@
 #include "revng/mlir/Dialect/Clift/IR/CliftOpHelpers.h"
 #include "revng/mlir/Dialect/Clift/IR/CliftOps.h"
 #include "revng/mlir/Dialect/Clift/Transforms/Passes.h"
+#include "revng/mlir/Dialect/Clift/Utils/LoopPromotion.h"
 
 namespace mlir {
 namespace clift {
@@ -109,7 +110,8 @@ static void createLoop(clift::FunctionOp Function,
   Builder.setInsertionPointToStart(&Loop.getCondition().emplaceBlock());
   auto IntType = clift::PrimitiveType::get(Builder.getContext(),
                                            clift::PrimitiveKind::SignedKind,
-                                           /*Size=*/1);
+                                           //clift::PrimitiveKind::GenericKind,
+                                           /*Size=*/4);
   Builder.create<clift::YieldOp>(LoopLoc,
                                  Builder.create<clift::ImmediateOp>(LoopLoc,
                                                                     IntType,
@@ -145,10 +147,19 @@ static void createLoop(clift::FunctionOp Function,
   }
 }
 
-static void inspectLoops(clift::FunctionOp Function) {
-  if (Function.getName().startswith("local_0x400920")) {
-    dbg << "HERE\n";
+struct LoopPromotionPass
+  : clift::impl::CliftLoopPromotionBase<LoopPromotionPass> {
+
+  void runOnOperation() override {
+    getOperation()->walk([](clift::FunctionOp Function) {
+      inspectLoops(Function);
+    });
   }
+};
+
+} // namespace
+
+void mlir::clift::inspectLoops(clift::FunctionOp Function) {
 
   llvm::SmallVector<std::pair<clift::AssignLabelOp, size_t>> LoopLabels;
   llvm::SmallVector<clift::GoToOp> LoopGotos;
@@ -165,18 +176,6 @@ static void inspectLoops(clift::FunctionOp Function) {
     createLoop(Function, Label, llvm::ArrayRef(LoopGotos).slice(I, GotoCount));
   }
 }
-
-struct LoopPromotionPass
-  : clift::impl::CliftLoopPromotionBase<LoopPromotionPass> {
-
-  void runOnOperation() override {
-    getOperation()->walk([](clift::FunctionOp Function) {
-      inspectLoops(Function);
-    });
-  }
-};
-
-} // namespace
 
 clift::PassPtr<clift::FunctionOp> clift::createLoopPromotionPass() {
   return std::make_unique<LoopPromotionPass>();
