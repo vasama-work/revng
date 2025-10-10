@@ -4,6 +4,7 @@
 
 #include "llvm/ADT/ScopeExit.h"
 
+#include "revng/Clift/CliftOpHelpers.h"
 #include "revng/CliftEmitC/CBackend.h"
 #include "revng/CliftEmitC/CEmitter.h"
 
@@ -16,43 +17,9 @@ static RecursiveCoroutine<void> noopCoroutine() {
   rc_return;
 }
 
-template<typename Operation = mlir::Operation *>
-static Operation getOnlyOperation(mlir::Region &R) {
-  if (R.empty())
-    return {};
-
-  revng_assert(R.hasOneBlock());
-  mlir::Block &B = R.front();
-  auto Beg = B.begin();
-  auto End = B.end();
-
-  if (Beg == End)
-    return {};
-
-  mlir::Operation *Op = &*Beg;
-
-  if (++Beg != End)
-    return {};
-
-  if constexpr (std::is_same_v<Operation, mlir::Operation *>) {
-    return Op;
-  } else {
-    return mlir::dyn_cast<Operation>(Op);
-  }
-}
-
 static bool hasFallthrough(mlir::Region &R) {
-  // TODO: Refactor the logic of getting the last statement operation in a
-  // region into a separate getTrailingStatement helper function.
-
-  if (R.empty())
-    return true;
-
-  mlir::Block &B = R.front();
-  if (B.empty())
-    return true;
-
-  return not B.back().hasTrait<mlir::OpTrait::clift::NoFallthrough>();
+  mlir::Operation *Op = getTrailingOp(R);
+  return not(Op and Op->hasTrait<mlir::OpTrait::clift::NoFallthrough>());
 }
 
 enum class OperatorPrecedence {
