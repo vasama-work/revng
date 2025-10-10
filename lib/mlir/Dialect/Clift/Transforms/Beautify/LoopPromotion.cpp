@@ -1,6 +1,10 @@
 #include "revng/Support/Debug.h"
 #pragma clang optimize off
 
+#include <ranges>
+
+#include "llvm/ADT/MapVector.h"
+
 #include "mlir/Pass/Pass.h"
 
 #include "revng/mlir/Dialect/Clift/IR/CliftOpHelpers.h"
@@ -39,20 +43,6 @@ static bool isBackwardGoto(clift::GoToOp Goto, clift::AssignLabelOp Label) {
   }
 
   return true;
-}
-
-static size_t findBackwardGotos(clift::AssignLabelOp Label,
-                                llvm::SmallVector<clift::GoToOp> &Gotos) {
-  size_t TotalGotoCount = Gotos.size();
-
-  for (auto UserOp : Label.getLabelOp()->getUsers()) {
-    if (auto Goto = mlir::dyn_cast<clift::GoToOp>(UserOp)) {
-      if (isBackwardGoto(Goto, Label))
-        Gotos.push_back(Goto);
-    }
-  }
-
-  return Gotos.size() - TotalGotoCount;
 }
 
 static mlir::Block *extractAsBlock(mlir::Block *Block,
@@ -160,23 +150,24 @@ struct LoopPromotionPass
 } // namespace
 
 void mlir::clift::inspectLoops(clift::FunctionOp Function) {
-
-  llvm::SmallVector<std::pair<clift::AssignLabelOp, size_t>> LoopLabels;
-  llvm::SmallVector<clift::GoToOp> LoopGotos;
+  // Maps each label assignment to the backwards gotos targeting it.
+  llvm::MapVector<clift::AssignLabelOp, llvm::SmallVector<GoToOp, 2>> Labels;
 
   Function->walk([&](mlir::Operation *Op) {
     if (auto Label = mlir::dyn_cast<clift::AssignLabelOp>(Op)) {
-      if (size_t const GotoCount = findBackwardGotos(Label, LoopGotos))
-        LoopLabels.emplace_back(Label, GotoCount);
+      Labels.insert({ Label, {} });
+    } else if (auto Goto = mlir::dyn_cast<clift::GoToOp>(Op)) {
+      auto Iterator = Labels.find(Goto.getAssignLabelOp());
+      if (Iterator != Labels.end()) {
+        if (isBackwardGoto(Goto, Iterator->first))
+          Iterator->second.push_back(Goto);
+      }
     }
   });
 
-  std::reverse(LoopLabels.begin(), LoopLabels.end());
-  std::reverse(LoopGotos.begin(), LoopGotos.end());
-
-  for (size_t GotoIndex = 0; auto &[Label, GotoCount] : LoopLabels) {
-    size_t I = std::exchange(GotoIndex, GotoIndex + GotoCount);
-    createLoop(Function, Label, llvm::ArrayRef(LoopGotos).slice(I, GotoCount));
+  for (const auto &[Label, Gotos] : std::views::reverse(Labels)) {
+    if (not Gotos.empty())
+      createLoop(Function, Label, Gotos);
   }
 }
 
