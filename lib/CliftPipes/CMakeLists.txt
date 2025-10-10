@@ -4,6 +4,7 @@
 
 revng_add_analyses_library_internal(
   revngCliftPipes
+  BeautificationPipe.cpp
   CBackendPipe.cpp
   CliftContainer.cpp
   ClifterPipe.cpp
@@ -20,4 +21,5 @@ target_link_libraries(
   revngCliftImportModel
   revngCliftTransforms
   revngPipeline
-  revngPipes)
+  revngPipes
+  MLIRTransforms)
