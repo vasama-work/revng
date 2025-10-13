@@ -38,4 +38,8 @@ set(LLVM_TARGET_DEFINITIONS CliftOpInterfacesJump.td)
 mlir_tablegen(CliftOpInterfacesJump.h.inc -gen-op-interface-decls)
 mlir_tablegen(CliftOpInterfacesJump.cpp.inc -gen-op-interface-defs)
 
+set(LLVM_TARGET_DEFINITIONS CliftOpInterfacesFlow.td)
+mlir_tablegen(CliftOpInterfacesFlow.h.inc -gen-op-interface-decls)
+mlir_tablegen(CliftOpInterfacesFlow.cpp.inc -gen-op-interface-defs)
+
 add_mlir_dialect(Clift clift)
