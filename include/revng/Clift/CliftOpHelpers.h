@@ -39,7 +39,7 @@ struct BlockPosition {
                          BlockPosition const &) = default;
 };
 
-inline BlockPosition getGotoTarget(clift::GoToOp Goto) {
+inline BlockPosition getGotoTarget(clift::GotoOp Goto) {
   return BlockPosition::get(Goto.getLabelAssignmentOp().getOperation());
 }
 
