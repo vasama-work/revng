@@ -158,8 +158,36 @@ OpT getTrailingOp(mlir::Region &Region) {
   return getTrailingOp<OpT>(Region, [](OpT) { return true; });
 }
 
+
 inline YieldOp getYieldOp(mlir::Region &R) {
   return getTrailingOp<YieldOp>(R);
+}
+
+inline bool isBooleanExpression(mlir::Value Value) {
+  mlir::Operation *Op = Value.getDefiningOp();
+  return Op and Op->hasTrait<mlir::OpTrait::clift::ReturnsBoolean>();
+}
+
+inline mlir::OpOperand *getOnlyUse(mlir::Value Value) {
+  auto Begin = Value.use_begin();
+  auto End = Value.use_end();
+
+  if (Begin == End)
+    return nullptr;
+
+  return &*Begin;
+}
+
+template<typename OpT = mlir::Operation *>
+OpT getOnlyUser(mlir::Value Value) {
+  if (mlir::OpOperand *Operand = getOnlyUse(Value)) {
+    if constexpr (std::is_same_v<Operation, mlir::Operation *>) {
+      return Operand->getOwner();
+    } else {
+      return mlir::dyn_cast<OpT>(Operand->getOwner());
+    }
+  }
+  return nullptr;
 }
 
 template<typename... ArgsT>
@@ -178,5 +206,20 @@ inline bool isIndirectlyNoFallthrough(mlir::Region &R) {
   StatementOpInterface Op = getTrailingStatement(R);
   return Op and Op.isIndirectlyNoFallthrough();
 }
+
+//===-------------------------- Expression usage --------------------------===//
+
+/// Returns true if the value category of the value affects the behaviour of any
+/// of its users.
+bool isValueCategorySignificant(mlir::Value Value);
+
+/// Returns true if the value is discarded. A value might be discarded by for
+/// instance by an expression statement or a comma expression.
+bool isDiscarded(mlir::Value Value);
+
+/// Returns true if the value is boolean-tested. A value might be boolean-tested
+/// for instance by a control flow condition, a ternary expression or a logical
+/// expression.
+bool isBooleanTested(mlir::Value Value);
 
 } // namespace mlir::clift
