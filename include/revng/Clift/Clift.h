@@ -23,6 +23,9 @@
 
 namespace mlir::clift::impl {
 
+inline constexpr unsigned BreakLabelFlag = 1;
+inline constexpr unsigned ContinueLabelFlag = 2;
+
 bool verifyStatementRegion(Region &R);
 bool verifyExpressionRegion(Region &R, bool Required);
 

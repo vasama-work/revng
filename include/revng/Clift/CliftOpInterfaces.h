@@ -17,6 +17,20 @@ class LabelAssignmentOpInterface;
 
 namespace impl {
 
+/// Returns the break or continue label value (if any), depending on the
+/// specified index. (Index=0 for break, Index=1 for continue).
+template<typename LoopOpT>
+mlir::Value getLoopLabel(LoopOpT Op, unsigned Index) {
+  unsigned Mask = Op.getLabelMask();
+  unsigned Flag = 1 << Index;
+
+  if ((Mask & Flag) == 0)
+    return nullptr;
+
+  // The operand index is given by the value of the lower flag (if any):
+  return Op->getOperand(Mask & Flag >> 1);
+}
+
 LabelAssignmentOpInterface getLabelAssignment(mlir::Value Label);
 
 } // namespace impl
