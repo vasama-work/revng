@@ -20,6 +20,10 @@ struct BlockPosition {
     return BlockPosition{ Op->getBlock(), std::next(Op->getIterator()) };
   }
 
+  static BlockPosition getBegin(mlir::Region &R) {
+    return { &R.front(), R.front().begin() };
+  }
+
   static BlockPosition getEnd(mlir::Region &R) {
     return { &R.front(), R.front().end() };
   }
@@ -39,8 +43,18 @@ struct BlockPosition {
                          BlockPosition const &) = default;
 };
 
-inline BlockPosition getGotoTarget(clift::GotoOp Goto) {
-  return BlockPosition::get(Goto.getLabelAssignmentOp().getOperation());
+inline BlockPosition getJumpTarget(JumpStatementOpInterface Jump) {
+  mlir::Operation *Op = Jump.getLabelAssignmentOp();
+
+  if (auto Loop = mlir::dyn_cast<LoopOpInterface>(Op)) {
+    auto Label = Jump.getLabel();
+    if (Label == Loop.getBreakLabel())
+      return BlockPosition::getNext(Loop);
+    if (Label == Loop.getContinueLabel())
+      return BlockPosition::getEnd(Loop.getBody());
+  }
+
+  return BlockPosition::get(Op);
 }
 
 inline bool isEmptyRegionOrBlock(mlir::Region &R) {
@@ -59,8 +73,8 @@ inline bool isLastInBlock(mlir::Operation *Op) {
   return std::next(Op->getIterator()) == Op->getBlock()->end();
 }
 
-template<typename Operation = mlir::Operation *>
-Operation getOnlyOperation(mlir::Region &R) {
+template<typename OpT = mlir::Operation *>
+OpT getOnlyOperation(mlir::Region &R) {
   if (R.empty())
     return {};
 
@@ -77,10 +91,10 @@ Operation getOnlyOperation(mlir::Region &R) {
   if (++Beg != End)
     return {};
 
-  if constexpr (std::is_same_v<Operation, mlir::Operation *>) {
+  if constexpr (std::is_same_v<OpT, mlir::Operation *>) {
     return Op;
   } else {
-    return mlir::dyn_cast<Operation>(Op);
+    return mlir::dyn_cast<OpT>(Op);
   }
 }
 
