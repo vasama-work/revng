@@ -40,6 +40,8 @@ public:
 
     PM.addPass(mlir::createCanonicalizerPass());
     PM.addPass(clift::createLoopDetectionPass());
+    PM.addPass(clift::createBeautifyStatementsPass());
+    PM.addPass(clift::createBeautifyExpressionsPass());
     PM.addPass(clift::createCLegalizationPass(TargetCImplementation::Default));
 
     mlir::ModuleOp Module = CliftContainer.getModule();

@@ -6,6 +6,7 @@
 #define MLIR_CLIFT_PASSES
 
 include "mlir/Pass/PassBase.td"
+include "mlir/Rewrite/PassUtil.td"
 
 class Clift_Pass<string arg, string operation> : Pass<arg, operation> {
   let dependentDialects = ["clift::CliftDialect"];
@@ -14,6 +15,26 @@ class Clift_Pass<string arg, string operation> : Pass<arg, operation> {
 def CliftLoopDetection : Clift_Pass<"loop-detection", "clift::FunctionOp"> {
   let summary = "Detect Clift loops";
   let constructor = "mlir::clift::createLoopDetectionPass()";
+}
+
+def CliftBranchEqualization : Clift_Pass<"branch-equalization",
+                                         "clift::FunctionOp"> {
+  let summary = "Equalize Clift branches";
+  let constructor = "mlir::clift::createBranchEqualizationPass()";
+}
+
+def CliftBeautifyStatements : Clift_Pass<"beautify-statements",
+                                         "clift::FunctionOp"> {
+  let summary = "Beautify Clift statements";
+  let constructor = "mlir::clift::createBeautifyStatementsPass()";
+  let options = RewritePassUtils.options;
+}
+
+def CliftBeautifyExpressions : Clift_Pass<"beautify-expressions",
+                                          "clift::FunctionOp"> {
+  let summary = "Beautify Clift expressions";
+  let constructor = "mlir::clift::createBeautifyExpressionsPass()";
+  let options = RewritePassUtils.options;
 }
 
 def CliftCLegalization : Clift_Pass<"c-legalization", "clift::FunctionOp"> {

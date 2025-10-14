@@ -18,6 +18,10 @@ using PassPtr = std::unique_ptr<mlir::OperationPass<OpT>>;
 #include "revng/CliftTransforms/Passes.h.inc"
 
 PassPtr<clift::FunctionOp> createLoopDetectionPass();
+PassPtr<clift::FunctionOp> createBranchEqualizationPass();
+
+PassPtr<clift::FunctionOp> createBeautifyStatementsPass();
+PassPtr<clift::FunctionOp> createBeautifyExpressionsPass();
 
 PassPtr<clift::FunctionOp>
 createCLegalizationPass(const TargetCImplementation &Target);
