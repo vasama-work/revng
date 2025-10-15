@@ -623,6 +623,13 @@ mlir::LogicalResult DoWhileOp::verify() {
 
 //===-------------------------------- ForOp -------------------------------===//
 
+bool ForOp::isDiscardedExpression(mlir::Region &R) {
+  if (&R == &getInitializer())
+    return not getOnlyOp<LocalVariableOp>(R);
+
+  return &R == &getExpression();
+}
+
 void ForOp::build(OpBuilder &Builder,
                   OperationState &State,
                   LoopOpInterface OtherLoop) {
@@ -1079,6 +1086,24 @@ mlir::LogicalResult WhileOp::verify() {
 
 //===----------------------------- Expressions ----------------------------===//
 
+//===------------------------------- YieldOp ------------------------------===//
+
+bool YieldOp::isDiscardedOperand(mlir::OpOperand &Operand) {
+  mlir::Region *R = getOperation()->getParentRegion();
+  revng_assert(R != nullptr);
+
+  auto Statement = mlir::cast<StatementOpInterface>(R->getParentOp());
+  return Statement.isDiscardedExpression(*R);
+}
+
+bool YieldOp::isBooleanTestedOperand(mlir::OpOperand &Operand) {
+  mlir::Region *R = getOperation()->getParentRegion();
+  revng_assert(R != nullptr);
+
+  auto Statement = mlir::cast<StatementOpInterface>(R->getParentOp());
+  return Statement.isBooleanTestedExpression(*R);
+}
+
 //===------------------------------ StringOp ------------------------------===//
 
 mlir::LogicalResult StringOp::verify() {
@@ -1377,6 +1402,13 @@ bool AccessOp::isLvalueExpression() {
   return isIndirect() or clift::isLvalueExpression(getValue());
 }
 
+bool AccessOp::reliesOnOperandValueCategory(mlir::OpOperand &Operand) {
+  if (isIndirect())
+    return false;
+
+  return clift::isValueCategorySignificant(getResult());
+}
+
 ClassType AccessOp::getClassType() {
   auto ObjectT = dealias(getValue().getType(), /*IgnoreQualifiers=*/true);
 
@@ -1442,6 +1474,15 @@ mlir::LogicalResult SubscriptOp::verify() {
                          << " result type must match the pointer type.";
 
   return mlir::success();
+}
+
+//===------------------------------- CommaOp ------------------------------===//
+
+bool CommaOp::reliesOnOperandValueCategory(mlir::OpOperand &Operand) {
+  if (Operand.getOperandNumber() == 0)
+    return false;
+
+  return clift::isValueCategorySignificant(getResult());
 }
 
 //===-------------------------------- UseOp -------------------------------===//

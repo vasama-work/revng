@@ -373,6 +373,12 @@ def Clift_DoWhileOp : Clift_LoopStatementOp<"do_while", [NoRegionArguments]> {
   }];
 
   let hasVerifier = 1;
+
+  let extraClassDeclaration = [{
+    [[nodiscard]] bool isBooleanTestedExpression(mlir::Region &R) {
+      return &R == &getCondition();
+    }
+  }];
 }
 
 def Clift_ExpressionStatementOp : Clift_StatementOp<"expr"> {
@@ -380,6 +386,12 @@ def Clift_ExpressionStatementOp : Clift_StatementOp<"expr"> {
 
   let assemblyFormat = [{
     $expression attr-dict-with-keyword
+  }];
+
+  let extraClassDeclaration = [{
+    [[nodiscard]] bool isDiscardedExpression(mlir::Region &R) {
+      return true;
+    }
   }];
 }
 
@@ -391,6 +403,14 @@ def Clift_ForOp : Clift_LoopStatementOp<"for"> {
 
   let hasCustomAssemblyFormat = 1;
   let hasVerifier = 1;
+
+  let extraClassDeclaration = [{
+    [[nodiscard]] bool isDiscardedExpression(mlir::Region &R);
+
+    [[nodiscard]] bool isBooleanTestedExpression(mlir::Region &R) {
+      return &R == &getCondition();
+    }
+  }];
 }
 
 def Clift_GotoOp : Clift_JumpStatementOp<"goto"> {
@@ -420,6 +440,10 @@ def Clift_IfOp : Clift_BasicStatementOp<"if", Clift_BranchOpInterface> {
 
   let extraClassDeclaration = [{
     bool isIndirectlyNoFallthrough() const;
+
+    [[nodiscard]] bool isBooleanTestedExpression(mlir::Region &R) {
+      return &R == &getCondition();
+    }
   }];
 }
 
@@ -515,6 +539,12 @@ def Clift_WhileOp : Clift_LoopStatementOp<"while", [NoRegionArguments]> {
   }];
 
   let hasVerifier = 1;
+
+  let extraClassDeclaration = [{
+    [[nodiscard]] bool isBooleanTestedExpression(mlir::Region &R) {
+      return &R == &getCondition();
+    }
+  }];
 }
 
 //===----------------------------- Expressions ----------------------------===//
@@ -538,6 +568,11 @@ def Clift_YieldOp : Clift_ExpressionOp<"yield", [Terminator]> {
 
   let assemblyFormat = [{
     $value attr-dict `:` type($value)
+  }];
+
+  let extraClassDeclaration = [{
+    [[nodiscard]] bool isDiscardedOperand(mlir::OpOperand &Operand);
+    [[nodiscard]] bool isBooleanTestedOperand(mlir::OpOperand &Operand);
   }];
 }
 
@@ -650,6 +685,12 @@ class Clift_BinaryLogicalOp<string mnemonic>
     $lhs `,` $rhs attr-dict `:`
     custom<CliftOpOperandTypes>(type($lhs), type($rhs)) `->` type($result)
   }];
+
+  let extraClassDeclaration = [{
+    [[nodiscard]] bool isBooleanTestedOperand(mlir::OpOperand &Operand) {
+      return true;
+    }
+  }];
 }
 
 class Clift_ShiftOp<string mnemonic>
@@ -748,6 +789,12 @@ def Clift_LogicalNotOp
   let assemblyFormat = [{
     $value attr-dict `:` type($value) `->` type($result)
   }];
+
+  let extraClassDeclaration = [{
+    [[nodiscard]] bool isBooleanTestedOperand(mlir::OpOperand &Operand) {
+      return true;
+    }
+  }];
 }
 
 def Clift_LogicalAndOp : Clift_BinaryLogicalOp<"and">;
@@ -784,6 +831,12 @@ def Clift_CastOp : Clift_ExpressionOp<"cast", [NoMemoryEffect]> {
     `<` $kind `>` $value attr-dict `:` type($value) `->` type($result)
   }];
 
+  let extraClassDeclaration = [{
+    bool reliesOnOperandValueCategory(mlir::OpOperand &Operand) {
+      return getKind() == CastKind::Decay;
+    }
+  }];
+
   let hasVerifier = 1;
 }
 
@@ -803,6 +856,12 @@ def Clift_AddressofOp
   }];
 
   let hasVerifier = 1;
+
+  let extraClassDeclaration = [{
+    bool reliesOnOperandValueCategory(mlir::OpOperand &Operand) {
+      return true;
+    }
+  }];
 }
 
 def Clift_IndirectionOp
@@ -848,6 +907,10 @@ def Clift_AssignOp
     bool isLvalueExpression() {
       return true;
     }
+
+    bool reliesOnOperandValueCategory(mlir::OpOperand &Operand) {
+      return Operand.getOperandNumber() == 0;
+    }
   }];
 
   let hasVerifier = 1;
@@ -871,6 +934,9 @@ def Clift_AccessOp : Clift_ExpressionOp<"access", [NoMemoryEffect]> {
     }
 
     [[nodiscard]] bool isLvalueExpression();
+
+    bool reliesOnOperandValueCategory(mlir::OpOperand &Operand);
+
     [[nodiscard]] clift::ClassType getClassType();
     [[nodiscard]] clift::FieldAttr getFieldAttr();
   }];
@@ -918,6 +984,12 @@ def Clift_CommaOp : Clift_ExpressionOp<"comma",
   let extraClassDeclaration = [{
     bool isLvalueExpression() {
       return mlir::clift::isLvalueExpression(getRhs());
+    }
+
+    bool reliesOnOperandValueCategory(mlir::OpOperand &Operand);
+
+    [[nodiscard]] bool isDiscardedOperand(mlir::OpOperand &Operand) {
+      return &Operand == &getOperation()->getOpOperand(0);
     }
   }];
 }
@@ -969,6 +1041,12 @@ def Clift_TernaryOp
   let assemblyFormat = [{
     $condition `,` $lhs `,` $rhs attr-dict `:` `(`
     custom<CliftTernaryOpTypes>(type($condition), type($lhs), type($rhs)) `)`
+  }];
+
+  let extraClassDeclaration = [{
+    [[nodiscard]] bool isBooleanTestedOperand(mlir::OpOperand &Operand) {
+      return &Operand == &getOperation()->getOpOperand(0);
+    }
   }];
 }
 
