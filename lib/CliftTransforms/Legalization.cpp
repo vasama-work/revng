@@ -5,6 +5,7 @@
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
+#include "revng/Clift/CliftOpHelpers.h"
 #include "revng/CliftTransforms/Legalization.h"
 #include "revng/CliftTransforms/Passes.h"
 
@@ -26,7 +27,8 @@ static mlir::OpOperand &getOnlyUse(mlir::Value Value) {
 
 static void modifyResultType(mlir::PatternRewriter &Rewriter,
                              mlir::Operation *Op,
-                             clift::ValueType NewType) {
+                             clift::ValueType NewType,
+                             bool PreserveExpressionType = true) {
   mlir::OpResult Result = Op->getOpResult(0);
   mlir::OpOperand &OnlyUse = getOnlyUse(Result);
 
@@ -37,11 +39,13 @@ static void modifyResultType(mlir::PatternRewriter &Rewriter,
 
   Result.setType(NewType);
 
-  Rewriter.setInsertionPointAfter(Op);
-  OnlyUse.set(Rewriter.create<clift::CastOp>(Op->getLoc(),
-                                             OldType,
-                                             Result,
-                                             CastKind));
+  if (PreserveExpressionType and not clift::isDiscarded(Result)) {
+    Rewriter.setInsertionPointAfter(Op);
+    OnlyUse.set(Rewriter.create<clift::CastOp>(Op->getLoc(),
+                                               OldType,
+                                               Result,
+                                               CastKind));
+  }
 }
 
 static void modifyOperandType(mlir::PatternRewriter &Rewriter,
@@ -206,7 +210,11 @@ struct BooleanCanonicalizationPattern
     if (T.getSize() == CanonicalBooleanType.getSize())
       return mlir::failure();
 
-    modifyResultType(Rewriter, Op, CanonicalBooleanType);
+    modifyResultType(Rewriter,
+                     Op,
+                     CanonicalBooleanType,
+                     not clift::isBooleanTested(Result));
+
     return mlir::success();
   }
 };
