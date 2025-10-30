@@ -495,9 +495,19 @@ static mlir::IntegerAttr makeLoopLabelMask(mlir::MLIRContext *Context,
   return mlir::IntegerAttr::get(Context, llvm::APSInt(llvm::APInt(2, Mask)));
 }
 
-static void
-buildLoop(OpBuilder &Builder, OperationState &State, unsigned RegionCount) {
-  State.addAttribute("label_mask", makeLoopLabelMask(Builder.getContext(), 0));
+static void buildLoop(OpBuilder &Builder,
+                      OperationState &State,
+                      unsigned RegionCount,
+                      LoopOpInterface OtherLoop = {}) {
+  constexpr llvm::StringRef AttrName = "label_mask";
+
+  if (OtherLoop) {
+    State.addOperands(OtherLoop->getOperands());
+    State.addAttribute("label_mask", OtherLoop->getAttr("label_mask"));
+  } else {
+    State.addAttribute("label_mask",
+                       makeLoopLabelMask(Builder.getContext(), 0));
+  }
 
   for (unsigned I = 0; I < RegionCount; ++I)
     State.addRegion();
@@ -598,8 +608,10 @@ mlir::LogicalResult ContinueToOp::verify() {
 
 //===------------------------------ DoWhileOp -----------------------------===//
 
-void DoWhileOp::build(OpBuilder &Builder, OperationState &State) {
-  buildLoop(Builder, State, 2);
+void DoWhileOp::build(OpBuilder &Builder,
+                      OperationState &State,
+                      LoopOpInterface OtherLoop) {
+  buildLoop(Builder, State, 2, OtherLoop);
 }
 
 mlir::LogicalResult DoWhileOp::verify() {
@@ -612,8 +624,10 @@ mlir::LogicalResult DoWhileOp::verify() {
 
 //===-------------------------------- ForOp -------------------------------===//
 
-void ForOp::build(OpBuilder &Builder, OperationState &State) {
-  buildLoop(Builder, State, 4);
+void ForOp::build(OpBuilder &Builder,
+                  OperationState &State,
+                  LoopOpInterface OtherLoop) {
+  buildLoop(Builder, State, 4, OtherLoop);
 }
 
 mlir::ParseResult ForOp::parse(OpAsmParser &Parser, OperationState &Result) {
@@ -1025,8 +1039,10 @@ mlir::LogicalResult SwitchOp::verify() {
 
 //===------------------------------- WhileOp ------------------------------===//
 
-void WhileOp::build(OpBuilder &Builder, OperationState &State) {
-  buildLoop(Builder, State, 4);
+void WhileOp::build(OpBuilder &Builder,
+                    OperationState &State,
+                    LoopOpInterface OtherLoop) {
+  buildLoop(Builder, State, 2, OtherLoop);
 }
 
 mlir::LogicalResult WhileOp::verify() {
