@@ -530,25 +530,90 @@ void CTokenEmitter::emitStringLiteral(llvm::StringRef String) {
   PTML.emitLiteralContent("\"");
 }
 
-void CTokenEmitter::emitComment(llvm::StringRef Content, CommentKind Kind) {
-  auto Tag = PTML.initializeOpenTag(ptml::tags::Span);
-  Tag.emitAttribute(ptml::attributes::Token, ptml::tokens::Comment);
-  Tag.finalizeOpenTag();
+void CTokenEmitter::enterCommentImpl(CommentEmitter &Comment) {
+  revng_assert(CurrentCommentEmitter == nullptr);
+  CurrentCommentEmitter = &Comment;
 
-  if (Kind == CommentKind::Line) {
-    while (not Content.empty() and Content.back() == '\n')
-      Content = Content.substr(0, Content.size() - 1);
+  Comment.Tag.initializeOpenTag(PTML, ptml::tags::Span);
+  Comment.Tag.emitAttribute(ptml::attributes::Token, ptml::tokens::Comment);
+  Comment.Tag.finalizeOpenTag();
 
-    for (const auto &R : std::views::split(Content, '\n')) {
-      PTML.emitLiteralContent("//");
-      PTML.emitContent(std::string_view(R.begin(), R.end()));
-      PTML.emitContentNewline();
-    }
-  } else {
+  switch (Comment.Kind) {
+  case CommentKind::Line:
+    PTML.emitLiteralContent("//");
+    break;
+
+  case CommentKind::Block:
     PTML.emitLiteralContent("/*");
-    PTML.emitContent(Content);
-    PTML.emitLiteralContent("*/");
+    break;
   }
+}
+
+void CTokenEmitter::leaveCommentImpl(CommentEmitter &Comment) {
+  revng_assert(CurrentCommentEmitter == &Comment);
+  CurrentCommentEmitter = nullptr;
+
+  switch (Comment.Kind) {
+  case CommentKind::Line:
+    PTML.emitContentNewline();
+    break;
+
+  case CommentKind::Block:
+    PTML.emitLiteralContent("*/");
+    break;
+  }
+
+  Comment.Tag.close();
+}
+
+void CTokenEmitter::emitCommentLineStartImpl(CommentEmitter &Comment) {
+  switch (Comment.Kind) {
+  case CommentKind::Line:
+    PTML.emitLiteralContent("//");
+    break;
+
+  case CommentKind::Block:
+    PTML.emitLiteralContent("  ");
+    break;
+  }
+}
+
+void CTokenEmitter::emitEscapedCommentContentImpl(CommentEmitter &Comment,
+                                                  llvm::StringRef Content) {
+  switch (Comment.Kind) {
+  case CommentKind::Line:
+    PTML.emitContent(Content);
+    break;
+
+  case CommentKind::Block:
+    while (not Content.empty()) {
+      auto [Prefix, Suffix] = Content.split("*/");
+      PTML.emitContent(Prefix);
+      PTML.emitLiteralContent("  ");
+      Content = Suffix;
+    }
+    break;
+  }
+}
+
+void CTokenEmitter::emitCommentContentImpl(CommentEmitter &Comment,
+                                           llvm::StringRef Content) {
+  revng_assert(CurrentCommentEmitter == &Comment);
+
+  while (not Content.empty()) {
+    auto [Prefix, Suffix] = Content.split('\n');
+    emitEscapedCommentContentImpl(Comment, Prefix);
+    Content = Suffix;
+
+    if (not Content.empty()) {
+      PTML.emitContentNewline();
+      emitCommentLineStartImpl(Comment);
+    }
+  }
+}
+
+void CTokenEmitter::emitComment(llvm::StringRef Content, CommentKind Kind) {
+  emitComment(Kind).emitContent(Content);
 }
 
 void CTokenEmitter::emitIncludeDirective(llvm::StringRef Content,
