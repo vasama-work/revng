@@ -11,7 +11,12 @@
 #include "revng/Support/CTarget.h"
 
 class CTokenEmitter {
+public:
+  class CommentEmitter;
+
+private:
   ptml::Emitter PTML;
+  CommentEmitter *CurrentCommentEmitter = nullptr;
 
 public:
   explicit CTokenEmitter(llvm::raw_ostream &OS, ptml::Tagging Tags) :
@@ -178,6 +183,39 @@ public:
     Block,
   };
 
+  class CommentEmitter {
+    friend CTokenEmitter;
+
+    CTokenEmitter &Emitter;
+    CommentKind Kind;
+    ptml::Emitter::TagEmitter Tag;
+    bool IsAtBeginningOfLine = false;
+
+  public:
+    explicit CommentEmitter(CTokenEmitter &Emitter, CommentKind Kind) :
+      Emitter(Emitter), Kind(Kind) {
+      Emitter.enterCommentImpl(*this);
+    }
+
+    CommentEmitter(const CommentEmitter &) = delete;
+    CommentEmitter &operator=(const CommentEmitter &) = delete;
+
+    ~CommentEmitter() { Emitter.leaveCommentImpl(*this); }
+
+    [[nodiscard]] ptml::Emitter::TagEmitter
+    initializeOpenTag(llvm::StringRef Tag) {
+      return ptml::Emitter::TagEmitter(Emitter.PTML, Tag);
+    }
+
+    void emitContent(llvm::StringRef Content) {
+      Emitter.emitCommentContentImpl(*this, Content);
+    }
+  };
+
+  [[nodiscard]] CommentEmitter emitComment(CommentKind Kind) {
+    return CommentEmitter(*this, Kind);
+  }
+
   void emitComment(llvm::StringRef Content, CommentKind Kind);
 
   enum class IncludeMode : bool {
@@ -234,6 +272,14 @@ public:
   }
 
 private:
+  void enterCommentImpl(CommentEmitter &Comment);
+  void leaveCommentImpl(CommentEmitter &Comment);
+
+  void emitCommentLineStartImpl(CommentEmitter &Comment);
+  void emitEscapedCommentContentImpl(CommentEmitter &Comment,
+                                     llvm::StringRef Content);
+  void emitCommentContentImpl(CommentEmitter &Comment, llvm::StringRef Content);
+
   void enterScopeImpl(ptml::Emitter::TagEmitter &Tag,
                       Delimiter Delimiter,
                       int Indent,
