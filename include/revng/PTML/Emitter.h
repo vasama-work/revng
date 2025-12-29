@@ -4,13 +4,10 @@
 // This file is distributed under the MIT License. See LICENSE.md for details.
 //
 
-#include <ranges>
+#include "revng/PTML/IndentingEmitter.h"
 
 #include "llvm/ADT/ArrayRef.h"
-#include "llvm/ADT/StringRef.h"
 #include "llvm/Support/raw_ostream.h"
-
-#include "revng/Support/Assert.h"
 
 namespace ptml {
 
@@ -31,19 +28,16 @@ enum class Tagging : bool {
 /// PTML tag emission can be toggled using the ptml::Tagging parameter. Note
 /// that valid usage of the PTML tag emission interface is checked regardless
 /// of whether PTML tag emission is enabled.
-class Emitter {
+class Emitter : IndentingEmitter<Emitter> {
+  friend IndentingEmitter;
+
 public:
   class TagEmitter;
 
 private:
   llvm::raw_ostream &OS;
-
-  const TagEmitter *CurrentOpenTagEmitter = nullptr;
-
-  unsigned Indentation = 0;
-
   bool EmitTags = false;
-  bool IsAtBeginningOfLine = true;
+  const TagEmitter *CurrentOpenTagEmitter = nullptr;
 
 public:
   explicit Emitter(llvm::raw_ostream &OS, Tagging Tags) :
@@ -59,32 +53,27 @@ public:
     revng_assert(CurrentOpenTagEmitter == nullptr,
                  "Content shall not emitted while an opening tag is "
                  "unfinalized.");
-    OS << '\n';
-    IsAtBeginningOfLine = true;
+    return emitNewline();
   }
 
   void emitContent(llvm::StringRef String);
 
-  void indent(int Offset) {
-    if (Offset < 0)
-      revng_assert(Indentation >= static_cast<unsigned>(-Offset));
-
-    Indentation += static_cast<unsigned>(Offset);
-  }
+  using IndentingEmitter::indent;
+  using IndentingEmitter::indentation;
+  using IndentingEmitter::isAtBeginningOfLine;
 
   [[nodiscard]] TagEmitter initializeOpenTag(llvm::StringRef Tag);
 
 private:
-  void emitLiteralContentImpl(llvm::StringRef String);
-
-  void emitIndentedContent(llvm::StringRef String);
-
   template<bool EscapeQuotes = false>
   void emitEscapedContent(llvm::StringRef String);
 
-  void emitIndentation();
-
   void emitAttributeValue(llvm::StringRef String);
+
+  //===-------------------- IndentingEmitter interface --------------------===//
+
+  void emitLiteral(llvm::StringRef String);
+  void emitIndentation(unsigned Indentation);
 };
 
 /// \brief RAII object used for emitting PTML tags.
