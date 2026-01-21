@@ -101,10 +101,24 @@ def Clift_StatementRegionOpInterface
 
   let methods = [
     InterfaceMethod<
-      /*desc=*/"Returns the statement regions of this operation.",
-      "llvm::MutableArrayRef<mlir::Region>", "getStatementRegions", (ins),
+      /*desc=*/"Returns the number of statement regions of this operation.",
+      "unsigned", "getStatementRegionCount", (ins),
       /*methodBody=*/[{}],
       /*defaultImplementation=*/ [{}]
+    >,
+    InterfaceMethod<
+      /*desc=*/"Returns the specified statement region of this operation.",
+      "mlir::Region &", "getStatementRegion", (ins "unsigned":$index),
+      /*methodBody=*/[{}],
+      /*defaultImplementation=*/ [{}]
+    >,
+    InterfaceMethod<
+      /*desc=*/"Returns the statement regions of this operation.",
+      "mlir::clift::StatementRegionRange", "getStatementRegions", (ins),
+      /*methodBody=*/[{}],
+      /*defaultImplementation=*/ [{
+        return StatementRegionRange($_op, 0, $_op.getStatementRegionCount());
+      }]
     >,
   ];
 }
