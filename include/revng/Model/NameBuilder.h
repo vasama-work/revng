@@ -135,6 +135,11 @@ private:
     return Result;
   }
 
+  [[nodiscard]] std::string
+  automaticName(const model::StackFrame &StackFrame) const {
+    return Configuration.StackFrameVariableName();
+  }
+
 public:
   /// These method (and its overloads) should be the only way you obtain any
   /// name you embed into an artifact (be it decompiled c, disassembly, or
