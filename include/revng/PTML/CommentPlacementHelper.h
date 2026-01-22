@@ -20,23 +20,22 @@ struct StatementTraits {
   // See `HasStatementTraits` for the list of what this trait should provide.
 };
 
-template<typename NodeType>
-concept HasStatementTraits = requires(NodeType Node,
-                                      StatementTraits<NodeType>::StatementType
-                                        Statement) {
+template<typename Traits, typename NodeType>
+concept IsStatementTraitsFor = requires(NodeType Node,
+                                        Traits::StatementType Statement) {
   // using StatementType = /* your type */
-  typename StatementTraits<NodeType>::StatementType;
+  typename Traits::StatementType;
 
   // static RangeOf<StatementType> auto getStatements(NodeType);
-  {
-    StatementTraits<NodeType>::getStatements(Node)
-  } -> RangeOf<typename StatementTraits<NodeType>::StatementType>;
+  { Traits::getStatements(Node) } -> RangeOf<typename Traits::StatementType>;
 
   // static RangeOf<MetaAddress> auto getAddresses(StatementType);
-  {
-    StatementTraits<NodeType>::getAddresses(Statement)
-  } -> RangeOf<MetaAddress>;
+  { Traits::getAddresses(Statement) } -> RangeOf<MetaAddress>;
 };
+
+template<typename NodeType>
+concept HasStatementTraits = IsStatementTraitsFor<StatementTraits<NodeType>,
+                                                  NodeType>;
 
 } // namespace yield
 
@@ -66,6 +65,31 @@ struct GraphTraits<const llvm::DomTreeNodeBase<NodeType> *>
 } // namespace llvm
 
 namespace yield {
+
+template<typename NodeT>
+struct CommentPlacementDominatorTreeTraits {
+private:
+  using NodeType = std::remove_pointer_t<NodeT>;
+
+public:
+  using TreeType = llvm::DominatorTreeBase<NodeType, false>;
+  using TreeNodeType = const llvm::DomTreeNodeBase<NodeType> *;
+
+  static TreeType getTree(auto &&Graph) {
+    // Compute a dominator tree for the given graph to reduce duplicate
+    // comments: if a suitable statement is already dominated by another one,
+    // we can skip that emission.
+    TreeType Tree;
+    Tree.recalculate(Graph);
+    return Tree;
+  }
+
+  static TreeNodeType getTreeRoot(const TreeType &Tree) {
+    return Tree.getRootNode();
+  }
+
+  static NodeType *getNode(TreeNodeType Node) { return Node->getBlock(); }
+};
 
 /// This is a helper for deciding which statement (within a given graph) is
 /// best suited for emission of a given comment.
@@ -144,12 +168,11 @@ namespace yield {
 /// BUT based on the graph, the only way to reach `C` is through `B`! As such,
 /// there's not much downside to suppressing the `C` comment and only emitting
 /// one before `B`.
-template<HasStatementTraits NodeType>
+template<typename NodeType,
+         IsStatementTraitsFor<NodeType> Trait = StatementTraits<NodeType>,
+         typename TreeTrait = CommentPlacementDominatorTreeTraits<NodeType>>
 class CommentPlacementHelper {
 private:
-  using Trait = StatementTraits<NodeType>;
-  using InternalNodeType = std::remove_pointer_t<NodeType>;
-
   using StatementType = typename Trait::StatementType;
   using SLT = decltype(Trait::getAddresses(std::declval<StatementType>()));
   using StatementLocationType = std::decay_t<SLT>;
@@ -206,19 +229,15 @@ public:
       return;
     }
 
-    // Compute a dominator tree for the given graph to reduce duplicate
-    // comments: if a suitable statement is already dominated by another one,
-    // we can skip that emission.
-    using DominatorTreeType = llvm::DominatorTreeBase<InternalNodeType, false>;
-    DominatorTreeType DominatorTree;
-    DominatorTree.recalculate(Graph);
+    auto Tree = TreeTrait::getTree(Graph);
 
     std::vector<std::pair<Score, StatementLocationType>> Scores;
     Scores.resize(Function.Comments().size());
 
     // First build a score map - select the best location for each comment
-    for (auto Node : llvm::depth_first(DominatorTree.getRootNode())) {
-      for (const auto &Statement : Trait::getStatements(Node->getBlock())) {
+    for (auto Node : llvm::depth_first(TreeTrait::getTreeRoot(Tree))) {
+      for (const auto &Statement :
+           Trait::getStatements(TreeTrait::getNode(Node))) {
         StatementLocationType Location = Trait::getAddresses(Statement);
 
         for (auto &&Comment : Function.Comments()) {
@@ -246,25 +265,26 @@ public:
         HomelessComments.emplace_back(I, false, Score{}, &Comment.Location());
 
     TreeVisitor Visitor{ ResultMap, Function, Scores };
-    Visitor(DominatorTree.getRootNode());
+    Visitor(TreeTrait::getTreeRoot(Tree));
   }
 
 private:
-  // Use a dominator tree to build a node-to-comment-list map.
-  using DTNode = const llvm::DomTreeNodeBase<InternalNodeType> *;
   struct TreeVisitor {
+    using TreeNodeType = typename TreeTrait::TreeNodeType;
+
     std::unordered_map<StatementType, CommentList> &ResultMap;
     const model::Function &Function;
     const std::vector<std::pair<Score, StatementLocationType>> &Scores;
 
-    void operator()(const DTNode &RootNode) {
+    void operator()(TreeNodeType RootNode) {
       impl(RootNode, llvm::SmallBitVector(Scores.size()));
     }
 
   private:
-    RecursiveCoroutine<> impl(const DTNode &Node,
+    RecursiveCoroutine<> impl(TreeNodeType Node,
                               llvm::SmallBitVector AssignedInThisBranch) {
-      for (const auto &Statement : Trait::getStatements(Node->getBlock())) {
+      for (const auto &Statement :
+           Trait::getStatements(TreeTrait::getNode(Node))) {
         StatementLocationType Location = Trait::getAddresses(Statement);
         for (auto &&Comment : Function.Comments()) {
 
@@ -299,7 +319,7 @@ private:
 
       // Proceed on the children with a copy of the `AssignedInThisBranch` map
       // so that adjacent children don't affect each other.
-      for (const auto &Ch : llvm::children<DTNode>(Node))
+      for (const auto &Ch : llvm::children<TreeNodeType>(Node))
         rc_recur impl(Ch, llvm::SmallBitVector{ AssignedInThisBranch });
     }
   };
