@@ -1303,6 +1303,12 @@ private:
 
   /* LLVM control flow import */
 
+  std::string makeLocalEntityHandle(const auto &Rank) {
+    return pipeline::locationString(Rank,
+                                    CurrentModelFunction->Entry(),
+                                    NextLocalEntityIndex++);
+  }
+
   template<typename OpT, typename... ArgsT>
   OpT emitLocalDeclaration(mlir::Location Loc, ArgsT &&...Args) {
     mlir::OpBuilder::InsertionGuard Guard(Builder);
@@ -1341,8 +1347,9 @@ private:
     auto [Iterator, Inserted] = BlockMapping.try_emplace(BB);
 
     if (not Iterator->second.Label) {
-      Iterator->second
-        .Label = emitLocalDeclaration<MakeLabelOp>(getLocation(BB));
+      auto Label = emitLocalDeclaration<MakeLabelOp>(getLocation(BB));
+      Label.setHandle(makeLocalEntityHandle(revng::ranks::GotoLabel));
+      Iterator->second.Label = Label;
     }
 
     if (not Iterator->second.HasAssignLabel
@@ -1417,9 +1424,13 @@ private:
         // Non-constant alloca is not supported:
         revng_assert(not Size or llvm::isa<llvm::ConstantInt>(Size));
 
+        std::optional<std::string> Handle;
+
         clift::ValueType Type;
         if (hasStackTypeMetadata(Alloca)) {
           Type = importModelType(*getStackTypeFromMetadata(Alloca, Model));
+          Handle = pipeline::locationString(revng::ranks::StackFrameVariable,
+                                            CurrentModelFunction->Entry());
         } else if (hasVariableTypeMetadata(Alloca)) {
           Type = importModelType(*getVariableTypeFromMetadata(Alloca, Model));
         } else {
@@ -1431,6 +1442,11 @@ private:
 
         auto Op = emitLocalDeclaration<LocalVariableOp>(getLocation(Alloca),
                                                         Type);
+
+        if (not Handle)
+          Handle = makeLocalEntityHandle(revng::ranks::LocalVariable);
+        Op.setHandle(*Handle);
+
         auto [Iterator, Inserted] = AllocaMapping.try_emplace(Alloca, Op);
         revng_assert(Inserted);
 
@@ -1706,8 +1722,10 @@ public:
     revng_assert(Op.getBody().empty());
     mlir::Block &BodyBlock = Op.getBody().emplaceBlock();
 
+    CurrentModelFunction = MF;
     CurrentFunction = Op;
     CurrentLayout = abi::FunctionType::Layout::make(*getPrototype(*MF));
+    NextLocalEntityIndex = 0;
 
     // Clear the function-specific mappings once this function is emitted.
     auto MappingGuard = llvm::make_scope_exit([&]() {
@@ -1761,8 +1779,10 @@ private:
   const model::Binary &Model;
   mlir::OpBuilder Builder;
 
+  const model::Function *CurrentModelFunction;
   clift::FunctionOp CurrentFunction;
   abi::FunctionType::Layout CurrentLayout;
+  uint64_t NextLocalEntityIndex;
 
   mlir::Block *LocalDeclarationBlock = nullptr;
 
