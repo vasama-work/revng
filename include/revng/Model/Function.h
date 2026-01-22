@@ -9,6 +9,7 @@
 #include "revng/Model/CallSitePrototype.h"
 #include "revng/Model/CommonFunctionMethods.h"
 #include "revng/Model/FunctionAttribute.h"
+#include "revng/Model/StackFrame.h"
 #include "revng/Model/StatementComment.h"
 #include "revng/Model/TypeDefinition.h"
 #include "revng/Support/MetaAddress.h"
@@ -27,6 +28,14 @@ public:
   using generated::Function::Function;
 
 public:
+  UpcastablePointer<model::Type> &StackFrameType() {
+    return StackFrame().Type();
+  }
+
+  const UpcastablePointer<model::Type> &StackFrameType() const {
+    return StackFrame().Type();
+  }
+
   /// The helper for stack frame type unwrapping.
   /// Use this when you need to access/modify the existing struct,
   /// and \ref StackFrameType() when you need to assign a new one.
