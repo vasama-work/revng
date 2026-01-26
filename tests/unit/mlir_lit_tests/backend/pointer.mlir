@@ -24,30 +24,27 @@ module attributes {clift.module} {
     handle = "/function/0x40001001:Code_x86_64"
   } {
     // CHECK: const int32_t var_0 = 0;
-    %x = clift.local : !int32_t$const = {
+    %x = clift.local as "var_0" : !int32_t$const = {
       %0 = clift.imm 0 : !int32_t
       clift.yield %0 : !int32_t
     } attributes {
-      handle = "/local-variable/0x40001001:Code_x86_64/0",
-      name = "var_0"
+      handle = "/local-variable/0x40001001:Code_x86_64/0"
     }
 
     // CHECK: const int32_t *const var_1 = &var_0;
-    %p = clift.local : !int32_t$const$ptr$const = {
+    %p = clift.local as "var_1" : !int32_t$const$ptr$const = {
       %0 = clift.addressof %x : !int32_t$const$ptr
       clift.yield %0 : !int32_t$const$ptr
     } attributes {
-      handle = "/local-variable/0x40001001:Code_x86_64/1",
-      name = "var_1"
+      handle = "/local-variable/0x40001001:Code_x86_64/1"
     }
 
     // CHECK: const int32_t *const *const var_2 = &var_1;
-    %q = clift.local : !int32_t$const$ptr$const$ptr$const = {
+    %q = clift.local as "var_2" : !int32_t$const$ptr$const$ptr$const = {
       %0 = clift.addressof %p : !int32_t$const$ptr$const$ptr
       clift.yield %0 : !int32_t$const$ptr$const$ptr
     } attributes {
-      handle = "/local-variable/0x40001001:Code_x86_64/2",
-      name = "var_2"
+      handle = "/local-variable/0x40001001:Code_x86_64/2"
     }
   }
   // CHECK: }

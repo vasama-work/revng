@@ -23,9 +23,8 @@ module attributes {clift.module} {
     ]
   } {
     // CHECK: int32_t y A3(argument);
-    clift.local : !int32_t attributes {
+    clift.local as "y" : !int32_t attributes {
       handle = "/local-variable/0x40001001:Code_x86_64/0",
-      name = "y",
       clift.attributes = [
         #clift.attribute<"A3" : "/support-library/A3"("argument")>
       ]

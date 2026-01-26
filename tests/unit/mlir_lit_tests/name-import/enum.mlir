@@ -24,7 +24,7 @@ module attributes { clift.module } {
   clift.func @g<!g>() attributes {
     handle = "/function/0x40001003:Code_x86_64"
   } {
-    // CHECK: %0 = clift.local : !e
+    // CHECK: %0 = clift.local as "var_0" : !e
     %0 = clift.local : !e
   }
 }

@@ -34,14 +34,12 @@ module attributes {clift.module} {
   clift.func @fun_0x40001001<!f>() attributes {
     handle = "/function/0x40001001:Code_x86_64"
   } {
-    %s = clift.local : !s$p attributes {
-      handle = "/local-variable/0x40001001:Code_x86_64/0",
-      name = "var_0"
+    %s = clift.local as "var_0" : !s$p attributes {
+      handle = "/local-variable/0x40001001:Code_x86_64/0"
     }
 
-    %u = clift.local : !u$p attributes {
-      handle = "/local-variable/0x40001001:Code_x86_64/1",
-      name = "var_1"
+    %u = clift.local as "var_1" : !u$p attributes {
+      handle = "/local-variable/0x40001001:Code_x86_64/1"
     }
 
     // CHECK: var_0->x;

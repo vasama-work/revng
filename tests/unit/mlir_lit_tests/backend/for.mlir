@@ -28,12 +28,11 @@ module attributes {clift.module} {
 
     // CHECK: for (int32_t x = 2; x; x) {
     clift.for init : !int32_t {
-      clift.local : !int32_t = {
+      clift.local as "x" : !int32_t = {
         %2 = clift.imm 2 : !int32_t
         clift.yield %2 : !int32_t
       } attributes {
-        handle = "/local-variable/0x40001001:Code_x86_64/0",
-        name = "x"
+        handle = "/local-variable/0x40001001:Code_x86_64/0"
       }
     } cond (%x) {
       clift.yield %x : !int32_t

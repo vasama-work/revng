@@ -44,44 +44,39 @@ module attributes {clift.module} {
     handle = "/function/0x40001001:Code_x86_64"
   } {
     // CHECK: my_enum var_0;
-    %e = clift.local : !my_enum attributes {
-      handle = "/local-variable/0x40001001:Code_x86_64/0",
-      name = "var_0"
+    %e = clift.local as "var_0" : !my_enum attributes {
+      handle = "/local-variable/0x40001001:Code_x86_64/0"
     }
 
     // CHECK: my_struct var_1;
-    %s = clift.local : !my_struct attributes {
-      handle = "/local-variable/0x40001001:Code_x86_64/1",
-      name = "var_1"
+    %s = clift.local as "var_1" : !my_struct attributes {
+      handle = "/local-variable/0x40001001:Code_x86_64/1"
     }
 
     // CHECK: my_union var_2;
-    %u = clift.local : !my_union attributes {
-      handle = "/local-variable/0x40001001:Code_x86_64/2",
-      name = "var_2"
+    %u = clift.local as "var_2" : !my_union attributes {
+      handle = "/local-variable/0x40001001:Code_x86_64/2"
     }
 
     // CHECK: int32_t var_3 = 42;
-    %i = clift.local : !int32_t = {
+    %i = clift.local as "var_3" : !int32_t = {
       %42 = clift.imm 42 : !int32_t
       clift.yield %42 : !int32_t
     } attributes {
-      handle = "/local-variable/0x40001001:Code_x86_64/3",
-      name = "var_3"
+      handle = "/local-variable/0x40001001:Code_x86_64/3"
     }
 
     // CHECK: my_pair var_4 = {
     // CHECK:   1,
     // CHECK:   2
     // CHECK: };
-    %p = clift.local : !my_pair = {
+    %p = clift.local as "var_4" : !my_pair = {
       %1 = clift.imm 1 : !int32_t
       %2 = clift.imm 2 : !int32_t
       %r = clift.aggregate(%1, %2) : !my_pair
       clift.yield %r : !my_pair
     } attributes {
-      handle = "/local-variable/0x40001001:Code_x86_64/4",
-      name = "var_4"
+      handle = "/local-variable/0x40001001:Code_x86_64/4"
     }
 
     // CHECK: var_0;

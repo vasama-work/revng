@@ -286,7 +286,7 @@ def Clift_MakeLabelOp : Clift_StatementOp<"make_label"> {
   let results = (outs Clift_LabelType:$result);
 
   let assemblyFormat = [{
-    attr-dict
+    (`as` $name^)? attr-dict
   }];
 
   let hasCanonicalizeMethod = 1;
@@ -480,7 +480,7 @@ def Clift_LocalVariableOp : Clift_StatementOp<"local"> {
   let regions = (region Clift_OptionalExpressionRegion:$initializer);
 
   let assemblyFormat = [{
-    `:` type($result) (`=` $initializer^)? attr-dict-with-keyword
+    (`as` $name^)? `:` type($result) (`=` $initializer^)? attr-dict-with-keyword
   }];
 
   let extraClassDeclaration = [{

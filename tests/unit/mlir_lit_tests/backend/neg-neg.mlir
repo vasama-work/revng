@@ -19,9 +19,8 @@ module attributes {clift.module} {
     handle = "/function/0x40001001:Code_x86_64"
   } {
     // CHECK: int32_t x;
-    %x = clift.local : !int32_t attributes {
-      handle = "/local-variable/0x40001001:Code_x86_64/0",
-      name = "x"
+    %x = clift.local as "x" : !int32_t attributes {
+      handle = "/local-variable/0x40001001:Code_x86_64/0"
     }
 
     // CHECK: - -0;
