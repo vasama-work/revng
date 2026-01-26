@@ -94,6 +94,12 @@ static void printCliftTernaryOpTypes(OpAsmPrinter &Printer,
 namespace clift = mlir::clift;
 using namespace clift;
 
+static void printString(mlir::AsmPrinter &Printer, llvm::StringRef String) {
+  Printer << '\"';
+  llvm::printEscapedString(String, Printer.getStream());
+  Printer << '\"';
+}
+
 void CliftDialect::registerOperations() {
   addOperations</* Include the auto-generated clift operations */
 #define GET_OP_LIST
@@ -328,6 +334,100 @@ void FunctionOp::build(mlir::OpBuilder &Builder,
         /*res_attrs=*/GetArrayAttr(1));
 }
 
+using ParserArgumentVector = llvm::SmallVectorImpl<mlir::OpAsmParser::Argument>;
+
+static mlir::ParseResult
+parseFunctionParameterList(mlir::OpAsmParser &Parser,
+                           ParserArgumentVector &Arguments) {
+  std::optional<bool> LastHadSSA;
+
+  auto ParseArgument = [&]() -> mlir::ParseResult {
+    mlir::SMLoc ArgumentLocation = Parser.getCurrentLocation();
+
+    if (Parser.parseOptionalEllipsis().succeeded()) {
+      return Parser.emitError(ArgumentLocation,
+                              "variadic functions are not yet supported");
+    }
+
+    mlir::OpAsmParser::Argument Argument;
+
+    auto R = Parser.parseOptionalOperand(Argument.ssaName,
+                                         /*allowResultNumber=*/false);
+    bool HasSSA = R.has_value();
+
+    if (LastHadSSA and HasSSA != *LastHadSSA) {
+      return Parser.emitError(ArgumentLocation,
+                              "SSA names must be specified for all "
+                              "arguments, or for none");
+    }
+
+    if (not LastHadSSA)
+      LastHadSSA = HasSSA;
+
+    mlir::StringAttr NameAttr;
+    if (HasSSA) {
+      if (Parser.parseOptionalKeyword("as").succeeded()) {
+        std::string Name;
+        if (Parser.parseString(&Name).failed())
+          return mlir::failure();
+        NameAttr = mlir::StringAttr::get(Parser.getContext(), Name);
+      }
+    } else {
+      std::string Name;
+      if (Parser.parseOptionalString(&Name).succeeded())
+        NameAttr = mlir::StringAttr::get(Parser.getContext(), Name);
+    }
+
+    if (HasSSA and Parser.parseColon().failed())
+      return mlir::failure();
+
+    if (Parser.parseType(Argument.type).failed())
+      return mlir::failure();
+
+    mlir::NamedAttrList Attrs;
+    if (Parser.parseOptionalAttrDict(Attrs).failed())
+      return mlir::failure();
+    Argument.attrs = Attrs.getDictionary(Parser.getContext());
+
+    if (Parser.parseOptionalLocationSpecifier(Argument.sourceLoc).failed())
+      return mlir::failure();
+
+    Arguments.push_back(Argument);
+    return mlir::success();
+  };
+
+  return Parser.parseCommaSeparatedList(mlir::OpAsmParser::Delimiter::Paren,
+                                        ParseArgument);
+}
+
+static mlir::ParseResult parseFunctionReturnType(mlir::OpAsmParser &Parser,
+                                                 mlir::Type &Type,
+                                                 mlir::DictionaryAttr &Attrs) {
+  if (Parser.parseOptionalArrow().succeeded()) {
+    bool LParen = Parser.parseOptionalLParen().succeeded();
+
+    if (Parser.parseType(Type).failed())
+      return mlir::failure();
+
+    if (LParen) {
+      mlir::NamedAttrList AttrList;
+      if (Parser.parseOptionalAttrDict(AttrList).failed())
+        return mlir::failure();
+      Attrs = AttrList.getDictionary(Parser.getContext());
+    }
+
+    if (LParen and Parser.parseRParen().failed())
+      return mlir::failure();
+  } else {
+    Type = PrimitiveType::get(Parser.getContext(), PrimitiveKind::VoidKind, 0);
+  }
+
+  if (not Attrs)
+    Attrs = mlir::DictionaryAttr::get(Parser.getContext());
+
+  return mlir::success();
+}
+
 mlir::ParseResult FunctionOp::parse(mlir::OpAsmParser &Parser,
                                     mlir::OperationState &Result) {
   StringAttr SymbolNameAttr;
@@ -355,31 +455,13 @@ mlir::ParseResult FunctionOp::parse(mlir::OpAsmParser &Parser,
     return mlir::failure();
 
   llvm::SmallVector<OpAsmParser::Argument> Arguments;
-  llvm::SmallVector<mlir::Type> ResultTypes;
-  llvm::SmallVector<DictionaryAttr> ResultAttrs;
-  bool IsVariadic = false;
-
-  auto RoughResultTypeLocation = Parser.getCurrentLocation();
-  if (function_interface_impl::parseFunctionSignature(Parser,
-                                                      /*allowVariadic=*/false,
-                                                      Arguments,
-                                                      IsVariadic,
-                                                      ResultTypes,
-                                                      ResultAttrs)
-        .failed())
+  if (parseFunctionParameterList(Parser, Arguments).failed())
     return mlir::failure();
 
-  if (ResultTypes.size() > 1)
-    return Parser.emitError(RoughResultTypeLocation) << "expected no more than "
-                                                        "one result";
-
-  if (ResultTypes.empty()) {
-    ResultTypes.push_back(PrimitiveType::get(Parser.getContext(),
-                                             PrimitiveKind::VoidKind,
-                                             0,
-                                             false));
-    ResultAttrs.push_back(DictionaryAttr::get(Parser.getContext()));
-  }
+  mlir::Type ResultType;
+  mlir::DictionaryAttr ResultAttrs;
+  if (parseFunctionReturnType(Parser, ResultType, ResultAttrs).failed())
+    return mlir::failure();
 
   llvm::SmallVector<mlir::Type> ArgumentTypes;
   for (auto &Argument : Arguments)
@@ -408,8 +490,76 @@ mlir::ParseResult FunctionOp::parse(mlir::OpAsmParser &Parser,
   return mlir::success();
 }
 
+static void printFunctionParameterList(mlir::OpAsmPrinter &Printer,
+                                       mlir::Region &Region,
+                                       bool PrintArgumentNames,
+                                       llvm::ArrayRef<mlir::Type> Types,
+                                       mlir::ArrayAttr Attrs) {
+  Printer << '(';
+
+  for (unsigned I = 0; I < Types.size(); ++I) {
+    if (I != 0)
+      Printer << ", ";
+
+    auto ArgAttrs = Attrs ? mlir::cast_or_null<mlir::DictionaryAttr>(Attrs[I]) :
+                            mlir::DictionaryAttr(nullptr);
+
+    llvm::SmallVector<llvm::StringRef, 1> ElideAttrs;
+
+    if (PrintArgumentNames)
+      Printer.printOperand(Region.getArgument(I));
+
+    if (ArgAttrs) {
+      if (mlir::Attribute NameAttr = ArgAttrs.get("clift.name")) {
+        if (auto N = mlir::dyn_cast_or_null<mlir::StringAttr>(NameAttr)) {
+          if (PrintArgumentNames)
+            Printer << " as ";
+
+          printString(Printer, N.getValue());
+          ElideAttrs.push_back("clift.name");
+        }
+      }
+    }
+
+    if (PrintArgumentNames)
+      Printer << " : ";
+
+    Printer.printType(Types[I]);
+
+    if (ArgAttrs)
+      Printer.printOptionalAttrDict(ArgAttrs.getValue(), ElideAttrs);
+  }
+
+  Printer << ')';
+}
+
+static void printFunctionReturnType(mlir::OpAsmPrinter &Printer,
+                                    mlir::Type Type,
+                                    mlir::ArrayAttr AttrsArray) {
+  auto Attrs = AttrsArray ?
+                 mlir::cast_or_null<mlir::DictionaryAttr>(AttrsArray[0]) :
+                 mlir::DictionaryAttr(nullptr);
+
+  if (not clift::isVoid(Type) or Attrs) {
+    Printer << " -> ";
+
+    if (Attrs)
+      Printer << '(';
+
+    Printer.printType(Type);
+
+    if (Attrs) {
+      Printer.printOptionalAttrDict(Attrs.getValue());
+      Printer << ')';
+    }
+  }
+}
+
 void FunctionOp::print(mlir::OpAsmPrinter &Printer) {
   auto FunctionType = getFunctionType();
+
+  mlir::Region &Body = getBody();
+  bool HasBody = not Body.empty();
 
   Printer << ' ';
   Printer.printSymbolName(getSymName());
@@ -417,13 +567,15 @@ void FunctionOp::print(mlir::OpAsmPrinter &Printer) {
   Printer.printType(FunctionType);
   Printer << '>';
 
-  function_interface_impl::printFunctionSignature(Printer,
-                                                  *this,
-                                                  FunctionType
-                                                    .getArgumentTypes(),
-                                                  /*isVariadic=*/false,
-                                                  FunctionType
-                                                    .getResultTypes());
+  printFunctionParameterList(Printer,
+                             Body,
+                             HasBody,
+                             FunctionType.getArgumentTypes(),
+                             getArgAttrsAttr());
+
+  printFunctionReturnType(Printer,
+                          FunctionType.getReturnType(),
+                          getResAttrsAttr());
 
   function_interface_impl::printFunctionAttributes(Printer,
                                                    *this,
@@ -431,7 +583,7 @@ void FunctionOp::print(mlir::OpAsmPrinter &Printer) {
                                                      getArgAttrsAttrName(),
                                                      getResAttrsAttrName() });
 
-  if (Region &Body = getBody(); !Body.empty()) {
+  if (HasBody) {
     Printer << ' ';
     Printer.printRegion(Body,
                         /*printEntryBlockArgs=*/false,

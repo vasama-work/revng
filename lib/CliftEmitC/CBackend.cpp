@@ -171,13 +171,13 @@ public:
     mlir::Operation *Op = E.getOwner()->getParentOp();
 
     if (auto Function = mlir::dyn_cast<FunctionOp>(Op)) {
-      const auto &ArgAttrs = Function.getArgAttrs(E.getArgNumber());
-      const auto GetStringAttr = [&ArgAttrs](llvm::StringRef Name) {
-        return mlir::cast<mlir::StringAttr>(ArgAttrs.get(Name)).getValue();
-      };
+      const auto &Attrs = Function.getArgAttrs(E.getArgNumber());
 
-      C.emitIdentifier(GetStringAttr("clift.name"),
-                       GetStringAttr("clift.handle"),
+      revng_assert(Attrs.getOfType<mlir::StringAttr>("clift.name"),
+                   "Function argument name (clift.name) is missing.");
+
+      C.emitIdentifier(Attrs.getStringUnchecked("clift.name"),
+                       Attrs.getString("clift.handle", ""),
                        CTE::EntityKind::FunctionParameter,
                        CTE::IdentifierKind::Reference);
     } else if (auto For = mlir::dyn_cast<ForOp>(Op)) {
@@ -1163,19 +1163,19 @@ public:
       for (unsigned I = 0; I < Op.getArgCount(); ++I) {
         auto Attrs = Op.getArgAttrs(I);
 
-        auto GetStringAttr = [&Attrs](llvm::StringRef Name) {
-          return mlir::cast<mlir::StringAttr>(Attrs.get(Name)).getValue();
-        };
+        revng_assert(Attrs.getOfType<mlir::StringAttr>("clift.name"),
+                     "Function argument name (clift.name) is missing.");
 
-        mlir::ArrayAttr Attributes = {};
-        if (auto Attr = Attrs.get("clift.attributes")) {
-          Attributes = mlir::cast<mlir::ArrayAttr>(Attr);
+        llvm::StringRef Name = Attrs.getStringUnchecked("clift.name");
+        llvm::StringRef Handle = Attrs.getString("clift.name", /*Default=*/"");
+
+        mlir::ArrayAttr Attributes = //
+          Attrs.getOfType<mlir::ArrayAttr>("clift.attributes");
+
+        if (Attributes)
           revng_assert(isValidAttributeArray(Attributes));
-        }
 
-        ParameterDeclarators.emplace_back(GetStringAttr("clift.name"),
-                                          GetStringAttr("clift.handle"),
-                                          Attributes);
+        ParameterDeclarators.emplace_back(Name, Handle, Attributes);
       }
 
       emitDeclaration(Op.getFunctionType(),

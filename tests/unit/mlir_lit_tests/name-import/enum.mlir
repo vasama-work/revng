@@ -17,7 +17,7 @@
 }>
 
 module attributes { clift.module } {
-  // CHECK: clift.func @fun_0x40001003<!g>() -> !void
+  // CHECK: clift.func @fun_0x40001003<!g>()
   // CHECK: attributes {
   // CHECK:   handle = "/function/0x40001003:Code_x86_64"
   // CHECK: }

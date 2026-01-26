@@ -14,11 +14,10 @@
 
 module attributes { clift.module } {
   // CHECK: clift.func @fun_0x40001001<!f>(
-  // CHECK:   %arg0: !uint8_t {
+  // CHECK:   %arg0 as "a" : !uint8_t {
   // CHECK:     clift.handle = "/cabi-argument/1001-CABIFunctionDefinition/0"
-  // CHECK:     clift.name = "a"
   // CHECK:   }
-  // CHECK: ) -> !void
+  // CHECK: )
   // CHECK: attributes {
   // CHECK:   handle = "/function/0x40001001:Code_x86_64"
   // CHECK: }

@@ -18,15 +18,13 @@
 
 module attributes { clift.module } {
   // CHECK: clift.func @fun_0x40001002<!h>(
-  // CHECK:   %arg0: !uint64_t {
+  // CHECK:   %arg0 as "rcx" : !uint64_t {
   // CHECK:     clift.handle = "/raw-argument/1002-RawFunctionDefinition/rcx_x86_64"
-  // CHECK:     clift.name = "rcx"
   // CHECK:   }
-  // CHECK:   %arg1: !stack_1002_ {
+  // CHECK:   %arg1 as "stack_arguments" : !stack_1002_ {
   // CHECK:     clift.handle = "/raw-stack-arguments/1002-RawFunctionDefinition"
-  // CHECK:     clift.name = "stack_arguments"
   // CHECK:   }
-  // CHECK: ) -> !void
+  // CHECK: )
   // CHECK: attributes {
   // CHECK:   handle = "/function/0x40001002:Code_x86_64"
   // CHECK: }

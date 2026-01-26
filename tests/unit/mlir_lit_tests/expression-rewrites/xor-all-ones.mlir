@@ -10,7 +10,7 @@
 !f = !clift.func<"/model-type/1001" : !void(!uint32_t)>
 
 module attributes {clift.module} {
-  clift.func @f<!f>(%arg0 : !uint32_t) -> !void {
+  clift.func @f<!f>(%arg0 : !uint32_t {clift.name="foo"}) -> !void {
     // CHECK: clift.expr {
     clift.expr {
       %0 = clift.imm 0xFFFFFFFF : !uint32_t
