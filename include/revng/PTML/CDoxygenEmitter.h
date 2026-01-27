@@ -8,9 +8,14 @@
 #include "revng/PTML/DoxygenEmitter.h"
 
 namespace ptml {
+namespace detail {
 
-using CDoxygenCommentEmitter = //
-  DoxygenCommentEmitter<CTokenEmitter::CommentEmitter>;
+// Short enough to fit within the column limit...
+using CDoxComEmitter = DoxygenCommentEmitter<CTokenEmitter::CommentEmitter>;
+
+} // namespace detail
+
+using CDoxygenCommentEmitter = detail::CDoxComEmitter;
 
 [[nodiscard]] inline CDoxygenCommentEmitter
 emitDoxygenLineComment(CTokenEmitter &CE) {
