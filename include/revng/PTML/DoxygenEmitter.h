@@ -4,19 +4,10 @@
 // This file is distributed under the MIT License. See LICENSE.md for details.
 //
 
+#include "revng/PTML/CommentEmitter.h"
 #include "revng/PTML/Constants.h"
-#include "revng/PTML/Emitter.h"
 
 namespace ptml {
-namespace detail {
-
-template<typename CommentEmitterT>
-concept CommentEmitter = requires(CommentEmitterT &E, llvm::StringRef S) {
-  E.emitContent(S);
-  { E.initializeOpenTag(S) } -> std::same_as<Emitter::TagEmitter>;
-};
-
-} // namespace detail
 
 struct DoxygenCommentConfiguration {
   char KeywordSignifier = '\\';
@@ -25,7 +16,7 @@ struct DoxygenCommentConfiguration {
   llvm::StringRef LinePrefix;
 };
 
-template<detail::CommentEmitter CommentEmitterT>
+template<CommentEmitter CommentEmitterT>
 class DoxygenCommentEmitter
   : IndentingEmitter<DoxygenCommentEmitter<CommentEmitterT>> {
 
