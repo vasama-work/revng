@@ -54,15 +54,17 @@ public:
   }
 
   void emitNewline() {
-    static_cast<Derived *>(this)->emitLiteral("\n");
+    derived()->emitLiteral("\n");
     IsAtBeginningOfLine = true;
   }
 
 protected:
+  Derived * derived() { return static_cast<Derived *>(this); }
+
   void emitIndentationIfNeeded() {
     if (IsAtBeginningOfLine) {
       IsAtBeginningOfLine = false;
-      static_cast<Derived *>(this)->emitIndentation(Indentation);
+      derived()->emitIndentation(Indentation);
     }
   }
 
@@ -70,7 +72,7 @@ private:
   void emitLiteralImpl(llvm::StringRef String) {
     revng_assert(not String.empty());
     emitIndentationIfNeeded();
-    static_cast<Derived *>(this)->emitLiteral(String);
+    derived()->emitLiteral(String);
   }
 };
 
