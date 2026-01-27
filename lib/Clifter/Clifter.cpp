@@ -78,6 +78,138 @@ restoreInsertionPointAfter(mlir::OpBuilder &Builder,
 using ScopeGraphPostDomTree = llvm::PostDomTreeOnView<llvm::BasicBlock, Scope>;
 
 class ClifterImpl final : public Clifter {
+  // While importing the LLVM IR to Clift, we import types from both the model
+  // and from the LLVM IR. This creates some discrepancies, particularly around
+  // function parameters and return types. Within function bodies we are in the
+  // land of LLVM IR types, while any external input (arguments to the current
+  // function or return values from called functions) or output (the return
+  // value of the current function or arguments to called functions) have types
+  // imported from the model. For this reason some conversions must be inserted
+  // whenever we cross between the two typing domains.
+
+  struct StringLiteral {
+    clift::ArrayType Type;
+    std::string Data;
+  };
+
+  struct ArgumentMappingInfo {
+    mlir::Value Argument;
+
+    // True if the address of the value should be taken before use in Clift.
+    // When converting the model type of an argument to the LLVM IR typing,
+    // there may arise a discrepancy in representation: the model parameter may
+    // have type large_struct_t, while in the LLVM IR the parameter is passed by
+    // address. Taking the address of the argument before each use in the
+    // resulting Clift solves this discrepancy.
+    bool TakeAddressOnUse;
+
+    // While taking the address solves a discrepancy in representation, a
+    // discrepancy in kind may still remain: we might now have large_struct_t*,
+    // while the LLVM IR has an integer type. The representation is the same,
+    // but the import of a subsequent integer arithmetic operation on the value
+    // might fail. For this reason argument values are converted to the type
+    // imported directly from LLVM IR, thus ensuring that any subsequently
+    // imported expression remains valid.
+    mlir::Type CastType;
+  };
+
+  struct BlockMappingInfo {
+    // Point where the mapped LLVM IR basic block is emitted. If the block has
+    // not yet been visited, this is not set. Note that the LLVM IR basic block
+    // is not necessarily emitted at the *start* of any MLIR block.
+    mlir::OpBuilder::InsertPoint InsertPoint;
+
+    // The result value of the MakeLabelOp to be used as the target for gotos
+    // jumping into the mapped LLVM IR basic block.
+    mlir::Value Label;
+
+    // True if the AssignLabelOp has already been created.
+    bool HasAssignLabel = false;
+  };
+
+  struct ValueMappingInfo {
+    mlir::Value Value;
+
+    // See ArgumentMappingInfo::TakeAddressOnUse for more information. However,
+    // instead of arguments, this one applies to return values stored in local
+    // variables. For some function calls the importer creates local variables
+    // with the model typing, and when the LLVM IR function call returned by
+    // address, the address of the variable must be taken to resolve the
+    // discrepancy in representation.
+    bool TakeAddressOnUse;
+
+    ValueMappingInfo(mlir::Value Value) :
+      Value(Value), TakeAddressOnUse(false) {}
+  };
+
+  struct CurrentFunctionState {
+    clift::FunctionOp Function;
+    const model::Function &Model;
+    abi::FunctionType::Layout Layout;
+    ScopeGraphPostDomTree PostDomTree;
+
+    uint64_t NextLocalVariableIndex = 0;
+    uint64_t NextGotoLabelIndex = 0;
+
+    mlir::Block LocalDeclarationBlock;
+
+    // Maps LLVM IR function argument to a Clift argument description.
+    // Initialized before importing each function body. During expression import
+    // argument values are generated using the descriptions stored in this
+    // table.
+    llvm::DenseMap<const llvm::Argument *, ArgumentMappingInfo> ArgumentMapping;
+
+    // Maps LLVM IR basic block to a Clift import state for that block.
+    llvm::DenseMap<const llvm::BasicBlock *, BlockMappingInfo> BlockMapping;
+
+    // Maps LLVM IR alloca to a Clift local variable op result. Used during
+    // expression import to map uses of an alloca to the matching Clift local
+    // variable.
+    llvm::DenseMap<const llvm::AllocaInst *, mlir::Value> AllocaMapping;
+
+    // Maps an arbitrary LLVM IR value to a Clift value description. During
+    // expression import some values are only emitted once and any use of such a
+    // value is emitted using the description stored in this table.
+    llvm::DenseMap<const llvm::Value *, ValueMappingInfo> ValueMapping;
+
+    explicit CurrentFunctionState(ClifterImpl &Clifter,
+                                  clift::FunctionOp Function,
+                                  const model::Function &Model) :
+      Function(Function),
+      Model(Model),
+      Layout(abi::FunctionType::Layout::make(*Clifter.getPrototype(Model))) {}
+  };
+
+  mlir::MLIRContext *const Context;
+  mlir::ModuleOp CurrentModule;
+
+  const model::Binary &Model;
+  mlir::OpBuilder Builder;
+
+  clift::ValueType VoidTypeCache;
+
+  uint64_t PointerSize;
+  clift::ValueType VoidPointerTypeCache;
+  clift::ValueType IntptrTypeCache;
+
+  /* Per-module mappings - persisted between imported functions */
+
+  // Maps LLVM object to a Clift global op. Each used global object is only
+  // emitted once and hence forth the operation stored in this table is used.
+  llvm::DenseMap<const llvm::GlobalObject *, clift::GlobalOpInterface>
+    SymbolMapping;
+
+  // Maps LLVM object to a string literal description. Used for caching
+  // successful string literal detection results.
+  llvm::DenseMap<const llvm::GlobalVariable *, StringLiteral> StringMapping;
+
+  // Maps helper name to Clift function op. Each helper function declaration is
+  // only emitted once.
+  llvm::DenseMap<llvm::StringRef, clift::FunctionOp> HelperMapping;
+
+  // Current function state - reset for each imported function;
+  std::optional<CurrentFunctionState> CF;
+
 public:
   // It is important only to query minimal properties about the model in the
   // importer constructor to avoid all imported functions depending on those
@@ -604,7 +736,7 @@ private:
     revng_assert(llvm::isa<llvm::ReturnInst>(UseBegin->getUser()));
     revng_assert(std::next(UseBegin) == UseEnd);
 
-    auto T = mlir::dyn_cast<StructType>(CurrentFunction.getReturnType());
+    auto T = mlir::dyn_cast<StructType>(CF->Function.getReturnType());
     revng_assert(Call->arg_size() == T.getFields().size());
 
     llvm::SmallVector<mlir::Value> Initializers;
@@ -666,11 +798,6 @@ private:
                              emitHelperFunctionDeclaration(Callee),
                              Arguments);
   }
-
-  struct StringLiteral {
-    clift::ArrayType Type;
-    std::string Data;
-  };
 
   bool detectStringLiteralImpl(const llvm::GlobalVariable *V,
                                StringLiteral &String) {
@@ -762,7 +889,7 @@ private:
       revng_abort("Unsupported global object kind");
     }
 
-    if (auto It = ValueMapping.find(V); It != ValueMapping.end()) {
+    if (auto It = CF->ValueMapping.find(V); It != CF->ValueMapping.end()) {
       revng_log(ExpressionLog, "<existing value>");
 
       mlir::Value Value = It->second.Value;
@@ -780,8 +907,8 @@ private:
       revng_log(ExpressionLog, "llvm::Argument");
       LoggerIndent Indent(ExpressionLog);
 
-      auto It = ArgumentMapping.find(A);
-      revng_assert(It != ArgumentMapping.end());
+      auto It = CF->ArgumentMapping.find(A);
+      revng_assert(It != CF->ArgumentMapping.end());
 
       mlir::Value Value = It->second.Argument;
 
@@ -836,7 +963,7 @@ private:
     if (auto I = llvm::dyn_cast<llvm::AllocaInst>(V)) {
       mlir::Location Loc = SurroundingLocation;
 
-      if (auto It = AllocaMapping.find(I); It != AllocaMapping.end()) {
+      if (auto It = CF->AllocaMapping.find(I); It != CF->AllocaMapping.end()) {
         revng_log(ExpressionLog, "llvm::AllocaInst");
         LoggerIndent Indent(ExpressionLog);
 
@@ -1234,8 +1361,8 @@ private:
     if (auto I = llvm::dyn_cast<llvm::GetElementPtrInst>(V)) {
       auto Alloca = llvm::cast<llvm::AllocaInst>(I->getPointerOperand());
 
-      auto It = AllocaMapping.find(Alloca);
-      revng_assert(It != AllocaMapping.end());
+      auto It = CF->AllocaMapping.find(Alloca);
+      revng_assert(It != CF->AllocaMapping.end());
 
       auto AT = mlir::cast<clift::ArrayType>(It->second.getType());
       auto PT = makePointerType(AT.getElementType());
@@ -1306,7 +1433,7 @@ private:
   template<typename OpT, typename... ArgsT>
   OpT emitLocalDeclaration(mlir::Location Loc, ArgsT &&...Args) {
     mlir::OpBuilder::InsertionGuard Guard(Builder);
-    Builder.setInsertionPointToEnd(LocalDeclarationBlock);
+    Builder.setInsertionPointToEnd(&CF->LocalDeclarationBlock);
     OpT Op = Builder.create<OpT>(Loc, std::forward<ArgsT>(Args)...);
     return Op;
   }
@@ -1327,8 +1454,8 @@ private:
   }
 
   bool hasBeenEmitted(const llvm::BasicBlock *BB) {
-    auto It = BlockMapping.find(BB);
-    return It != BlockMapping.end() and It->second.InsertPoint.isSet();
+    auto It = CF->BlockMapping.find(BB);
+    return It != CF->BlockMapping.end() and It->second.InsertPoint.isSet();
   }
 
   // Emit a goto targeting the specified basic block.
@@ -1338,13 +1465,13 @@ private:
   //   and the matching assignment will be emitted when the basic block is
   //   emitted.
   void emitGoto(mlir::Location Loc, const llvm::BasicBlock *BB) {
-    auto [Iterator, Inserted] = BlockMapping.try_emplace(BB);
+    auto [Iterator, Inserted] = CF->BlockMapping.try_emplace(BB);
 
     if (not Iterator->second.Label) {
       auto Label = emitLocalDeclaration<MakeLabelOp>(getLocation(BB));
       Label.setHandle(pipeline::locationString(revng::ranks::GotoLabel,
-                                               CurrentModelFunction->Entry(),
-                                               NextGotoLabelIndex++));
+                                               CF->Model.Entry(),
+                                               CF->NextGotoLabelIndex++));
       Iterator->second.Label = Label;
     }
 
@@ -1386,7 +1513,7 @@ private:
 
     // Map BB to the MLIR block, emit label if necessary:
     {
-      auto [Iterator, Inserted] = BlockMapping.try_emplace(BB);
+      auto [Iterator, Inserted] = CF->BlockMapping.try_emplace(BB);
 
       // Save the current insertion point in case a label assignment must later
       // be emitted at the start of this block.
@@ -1426,7 +1553,7 @@ private:
         if (hasStackTypeMetadata(Alloca)) {
           Type = importModelType(*getStackTypeFromMetadata(Alloca, Model));
           Handle = pipeline::locationString(revng::ranks::StackFrameVariable,
-                                            CurrentModelFunction->Entry());
+                                            CF->Model.Entry());
         } else if (hasVariableTypeMetadata(Alloca)) {
           Type = importModelType(*getVariableTypeFromMetadata(Alloca, Model));
         } else {
@@ -1443,13 +1570,13 @@ private:
           // For any local variables without a more specific handle (e.g. stack
           // frame variable), a generic handle with increasing indices is used.
           Handle = pipeline::locationString(revng::ranks::LocalVariable,
-                                            CurrentModelFunction->Entry(),
-                                            NextLocalVariableIndex++);
+                                            CF->Model.Entry(),
+                                            CF->NextLocalVariableIndex++);
         }
 
         Op.setHandle(*Handle);
 
-        auto [Iterator, Inserted] = AllocaMapping.try_emplace(Alloca, Op);
+        auto [Iterator, Inserted] = CF->AllocaMapping.try_emplace(Alloca, Op);
         revng_assert(Inserted);
 
         continue;
@@ -1489,7 +1616,7 @@ private:
             return Builder.create<AssignOp>(Loc, Type, Local, Initializer);
           });
 
-          auto [Iterator, Inserted] = ValueMapping.try_emplace(Call, Local);
+          auto [Iterator, Inserted] = CF->ValueMapping.try_emplace(Call, Local);
           revng_assert(Inserted);
 
           Iterator->second.TakeAddressOnUse = Indirection;
@@ -1520,13 +1647,13 @@ private:
       auto Op = Builder.create<ReturnOp>(TerminalLoc);
 
       if (const llvm::Value *Value = Return->getReturnValue()) {
-        clift::FunctionType FunctionType = CurrentFunction.getFunctionType();
+        clift::FunctionType FunctionType = CF->Function.getFunctionType();
 
         clift::ValueType FuncReturnType = FunctionType.getReturnType();
         clift::ValueType LLVMReturnType = FuncReturnType;
 
         // In SPTAR functions, values are returned by address. In this case
-        if (CurrentLayout.hasSPTAR())
+        if (CF->Layout.hasSPTAR())
           LLVMReturnType = makePointerType(LLVMReturnType);
 
         // Emit the expression tree rooted at the return instruction directly
@@ -1562,7 +1689,7 @@ private:
           // In the case of SPTAR, because in the LLVM IR the return is by
           // address, but in Clift the return is by value as usual, a final
           // indirection is needed to convert the LLVM IR pointer to a value:
-          if (CurrentLayout.hasSPTAR()) {
+          if (CF->Layout.hasSPTAR()) {
             ReturnValue = Builder.create<IndirectionOp>(TerminalLoc,
                                                         FuncReturnType,
                                                         ReturnValue);
@@ -1694,8 +1821,8 @@ private:
   RecursiveCoroutine<void> emitScope(const llvm::BasicBlock *BB,
                                      const llvm::BasicBlock *OuterPostDom) {
     while (BB != OuterPostDom) {
-      const auto *InnerPostDom = PostDomTree[BB]->getIDom()->getBlock();
-      revng_assert(PostDomTree.dominates(OuterPostDom, InnerPostDom));
+      const auto *InnerPostDom = CF->PostDomTree[BB]->getIDom()->getBlock();
+      revng_assert(CF->PostDomTree.dominates(OuterPostDom, InnerPostDom));
 
       rc_recur emitBasicBlock(BB, InnerPostDom);
       BB = InnerPostDom;
@@ -1724,22 +1851,13 @@ public:
     revng_assert(Op.getBody().empty());
     mlir::Block &BodyBlock = Op.getBody().emplaceBlock();
 
-    CurrentModelFunction = MF;
-    CurrentFunction = Op;
-    CurrentLayout = abi::FunctionType::Layout::make(*getPrototype(*MF));
+    revng_assert(not CF);
+    CF.emplace(*this, Op, *MF);
 
-    NextLocalVariableIndex = 0;
-    NextGotoLabelIndex = 0;
+    // Clear the function-specific state once this function is emitted.
+    auto Guard = llvm::make_scope_exit([this]() { CF.reset(); });
 
-    // Clear the function-specific mappings once this function is emitted.
-    auto MappingGuard = llvm::make_scope_exit([&]() {
-      ArgumentMapping.clear();
-      BlockMapping.clear();
-      AllocaMapping.clear();
-      ValueMapping.clear();
-    });
-
-    llvm::ArrayRef LayoutArguments = getLayoutArguments(CurrentLayout);
+    llvm::ArrayRef LayoutArguments = getLayoutArguments(CF->Layout);
     revng_assert(F->arg_size() == Op.getArgumentTypes().size());
     revng_assert(F->arg_size() == LayoutArguments.size());
 
@@ -1751,6 +1869,7 @@ public:
     // type. That type is imported here and stored in the argument description.
     for (const auto [A, T, L] :
          llvm::zip(F->args(), Op.getArgumentTypes(), LayoutArguments)) {
+      auto &ArgumentMapping = CF->ArgumentMapping;
       ArgumentMapping.try_emplace(&A,
                                   BodyBlock.addArgument(T, Op->getLoc()),
                                   /*TakeAddressOnUse=*/isByAddressParameter(L),
@@ -1759,140 +1878,20 @@ public:
 
     // Compute the scope graph. While the computation should not modify the
     // function IR, it is not const-correct and so a const_cast must be used.
-    PostDomTree.recalculate(const_cast<llvm::Function &>(*F));
+    CF->PostDomTree.recalculate(const_cast<llvm::Function &>(*F));
 
     mlir::OpBuilder::InsertionGuard BuilderGuard(Builder);
     Builder.setInsertionPointToEnd(&BodyBlock);
 
-    mlir::Block DeclarationBlock;
-    ScopedExchange _(LocalDeclarationBlock, &DeclarationBlock);
-
     // Finally emit the function body starting at the entry block.
-    emitScope(&F->getEntryBlock(), PostDomTree.getRootNode()->getBlock());
+    emitScope(&F->getEntryBlock(),
+              CF->PostDomTree.getRootNode()->getBlock());
 
     BodyBlock.getOperations().splice(BodyBlock.getOperations().begin(),
-                                     DeclarationBlock.getOperations());
+                                     CF->LocalDeclarationBlock.getOperations());
 
     return Op;
   }
-
-private:
-  mlir::MLIRContext *const Context;
-  mlir::ModuleOp CurrentModule;
-
-  const model::Binary &Model;
-  mlir::OpBuilder Builder;
-
-  const model::Function *CurrentModelFunction;
-  clift::FunctionOp CurrentFunction;
-  abi::FunctionType::Layout CurrentLayout;
-
-  uint64_t NextLocalVariableIndex;
-  uint64_t NextGotoLabelIndex;
-
-  mlir::Block *LocalDeclarationBlock = nullptr;
-
-  ScopeGraphPostDomTree PostDomTree;
-
-  clift::ValueType VoidTypeCache;
-
-  uint64_t PointerSize;
-  clift::ValueType VoidPointerTypeCache;
-  clift::ValueType IntptrTypeCache;
-
-  // While importing the LLVM IR to Clift, we import types from both the model
-  // and from the LLVM IR. This creates some discrepancies, particularly around
-  // function parameters and return types. Within function bodies we are in the
-  // land of LLVM IR types, while any external input (arguments to the current
-  // function or return values from called functions) or output (the return
-  // value of the current function or arguments to called functions) have types
-  // imported from the model. For this reason some conversions must be inserted
-  // whenever we cross between the two typing domains.
-
-  struct ArgumentMappingInfo {
-    mlir::Value Argument;
-
-    // True if the address of the value should be taken before use in Clift.
-    // When converting the model type of an argument to the LLVM IR typing,
-    // there may arise a discrepancy in representation: the model parameter may
-    // have type large_struct_t, while in the LLVM IR the parameter is passed by
-    // address. Taking the address of the argument before each use in the
-    // resulting Clift solves this discrepancy.
-    bool TakeAddressOnUse;
-
-    // While taking the address solves a discrepancy in representation, a
-    // discrepancy in kind may still remain: we might now have large_struct_t*,
-    // while the LLVM IR has an integer type. The representation is the same,
-    // but the import of a subsequent integer arithmetic operation on the value
-    // might fail. For this reason argument values are converted to the type
-    // imported directly from LLVM IR, thus ensuring that any subsequently
-    // imported expression remains valid.
-    mlir::Type CastType;
-  };
-
-  struct BlockMappingInfo {
-    // Point where the mapped LLVM IR basic block is emitted. If the block has
-    // not yet been visited, this is not set. Note that the LLVM IR basic block
-    // is not necessarily emitted at the *start* of any MLIR block.
-    mlir::OpBuilder::InsertPoint InsertPoint;
-
-    // The result value of the MakeLabelOp to be used as the target for gotos
-    // jumping into the mapped LLVM IR basic block.
-    mlir::Value Label;
-
-    // True if the AssignLabelOp has already been created.
-    bool HasAssignLabel = false;
-  };
-
-  struct ValueMappingInfo {
-    mlir::Value Value;
-
-    // See ArgumentMappingInfo::TakeAddressOnUse for more information. However,
-    // instead of arguments, this one applies to return values stored in local
-    // variables. For some function calls the importer creates local variables
-    // with the model typing, and when the LLVM IR function call returned by
-    // address, the address of the variable must be taken to resolve the
-    // discrepancy in representation.
-    bool TakeAddressOnUse;
-
-    ValueMappingInfo(mlir::Value Value) :
-      Value(Value), TakeAddressOnUse(false) {}
-  };
-
-  /* Per-module mappings - persisted between imported functions */
-
-  // Maps LLVM object to a Clift global op. Each used global object is only
-  // emitted once and hence forth the operation stored in this table is used.
-  llvm::DenseMap<const llvm::GlobalObject *, clift::GlobalOpInterface>
-    SymbolMapping;
-
-  // Maps LLVM object to a string literal description. Used for caching
-  // successful string literal detection results.
-  llvm::DenseMap<const llvm::GlobalVariable *, StringLiteral> StringMapping;
-
-  // Maps helper name to Clift function op. Each helper function declaration is
-  // only emitted once.
-  llvm::DenseMap<llvm::StringRef, clift::FunctionOp> HelperMapping;
-
-  /* Per-function mappings - cleared for each imported function */
-
-  // Maps LLVM IR function argument to a Clift argument description. Initialized
-  // before importing each function body. During expression import argument
-  // values are generated using the descriptions stored in this table.
-  llvm::DenseMap<const llvm::Argument *, ArgumentMappingInfo> ArgumentMapping;
-
-  // Maps LLVM IR basic block to a Clift import state for that block.
-  llvm::DenseMap<const llvm::BasicBlock *, BlockMappingInfo> BlockMapping;
-
-  // Maps LLVM IR alloca to a Clift local variable op result. Used during
-  // expression import to map uses of an alloca to the matching Clift local
-  // variable.
-  llvm::DenseMap<const llvm::AllocaInst *, mlir::Value> AllocaMapping;
-
-  // Maps an arbitrary LLVM IR value to a Clift value description. During
-  // expression import some values are only emitted once and any use of such a
-  // value is emitted using the description stored in this table.
-  llvm::DenseMap<const llvm::Value *, ValueMappingInfo> ValueMapping;
 };
 
 } // namespace
