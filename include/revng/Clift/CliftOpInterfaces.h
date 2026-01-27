@@ -63,6 +63,8 @@ LabelAssignmentOpInterface getLabelAssignmentOp(mlir::Value Label);
 
 } // namespace impl
 
+/// \brief Provides a range over the statement regions of an operation by
+///        utilizing the index-based interface of StatementRegionOpInterface.
 struct StatementRegionRange : llvm::indexed_accessor_range<StatementRegionRange,
                                                            mlir::Operation *,
                                                            mlir::Region> {
