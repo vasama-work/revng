@@ -77,6 +77,8 @@ struct StatementRegionRange : llvm::indexed_accessor_range<StatementRegionRange,
   static mlir::Region &dereference(mlir::Operation *Op, ptrdiff_t Index);
 };
 
+/// \brief Provides a range over the expression regions of an operation by
+///        utilizing the index-based interface of ExpressionRegionOpInterface.
 struct ExpressionRegionRange
   : llvm::indexed_accessor_range<ExpressionRegionRange,
                                  mlir::Operation *,
