@@ -99,6 +99,12 @@ def Clift_ExpressionOpInterface : Clift_OpInterface<"ExpressionOpInterface"> {
 def Clift_StatementRegionOpInterface
   : Clift_OpInterface<"StatementRegionOpInterface"> {
 
+  let description = [{
+    This interface describes operations containing nested statement regions and
+    provides access to said regions. All present statement regions are always
+    exposed, even if empty.
+  }];
+
   let methods = [
     InterfaceMethod<
       /*desc=*/"Returns the number of statement regions of this operation.",
