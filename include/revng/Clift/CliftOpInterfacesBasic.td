@@ -132,6 +132,12 @@ def Clift_StatementRegionOpInterface
 def Clift_ExpressionRegionOpInterface
   : Clift_OpInterface<"ExpressionRegionOpInterface"> {
 
+  let description = [{
+    This interface describes operations containing nested expression regions and
+    provides access to said regions. All present expression regions are always
+    exposed, even if empty.
+  }];
+
   let methods = [
     InterfaceMethod<
       /*desc=*/"Returns the number of expression regions of this operation.",
