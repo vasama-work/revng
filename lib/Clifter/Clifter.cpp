@@ -1303,12 +1303,6 @@ private:
 
   /* LLVM control flow import */
 
-  std::string makeLocalEntityHandle(const auto &Rank) {
-    return pipeline::locationString(Rank,
-                                    CurrentModelFunction->Entry(),
-                                    NextLocalEntityIndex++);
-  }
-
   template<typename OpT, typename... ArgsT>
   OpT emitLocalDeclaration(mlir::Location Loc, ArgsT &&...Args) {
     mlir::OpBuilder::InsertionGuard Guard(Builder);
@@ -1348,7 +1342,9 @@ private:
 
     if (not Iterator->second.Label) {
       auto Label = emitLocalDeclaration<MakeLabelOp>(getLocation(BB));
-      Label.setHandle(makeLocalEntityHandle(revng::ranks::GotoLabel));
+      Label.setHandle(pipeline::locationString(revng::ranks::GotoLabel,
+                                               CurrentModelFunction->Entry(),
+                                               NextGotoLabelIndex++));
       Iterator->second.Label = Label;
     }
 
@@ -1443,8 +1439,14 @@ private:
         auto Op = emitLocalDeclaration<LocalVariableOp>(getLocation(Alloca),
                                                         Type);
 
-        if (not Handle)
-          Handle = makeLocalEntityHandle(revng::ranks::LocalVariable);
+        if (not Handle) {
+          // For any local variables without a more specific handle (e.g. stack
+          // frame variable), a generic handle with increasing indices is used.
+          Handle = pipeline::locationString(revng::ranks::LocalVariable,
+                                            CurrentModelFunction->Entry(),
+                                            NextLocalVariableIndex++);
+        }
+
         Op.setHandle(*Handle);
 
         auto [Iterator, Inserted] = AllocaMapping.try_emplace(Alloca, Op);
@@ -1725,7 +1727,9 @@ public:
     CurrentModelFunction = MF;
     CurrentFunction = Op;
     CurrentLayout = abi::FunctionType::Layout::make(*getPrototype(*MF));
-    NextLocalEntityIndex = 0;
+
+    NextLocalVariableIndex = 0;
+    NextGotoLabelIndex = 0;
 
     // Clear the function-specific mappings once this function is emitted.
     auto MappingGuard = llvm::make_scope_exit([&]() {
@@ -1782,7 +1786,9 @@ private:
   const model::Function *CurrentModelFunction;
   clift::FunctionOp CurrentFunction;
   abi::FunctionType::Layout CurrentLayout;
-  uint64_t NextLocalEntityIndex;
+
+  uint64_t NextLocalVariableIndex;
+  uint64_t NextGotoLabelIndex;
 
   mlir::Block *LocalDeclarationBlock = nullptr;
 
