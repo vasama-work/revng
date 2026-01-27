@@ -12,6 +12,15 @@
 #include "revng/Support/Assert.h"
 
 namespace ptml {
+namespace detail {
+
+template<typename Derived>
+concept IndentingEmitterDerived = requires (Derived &D) {
+  D.emitLiteral(llvm::StringRef());
+  D.emitIndentation(static_cast<unsigned>(0));
+};
+
+} // namespace detail
 
 template<typename Derived>
 class IndentingEmitter {
@@ -54,12 +63,16 @@ public:
   }
 
   void emitNewline() {
-    derived()->emitLiteral("\n");
+    derived()->emitLiteral(llvm::StringRef("\n"));
     IsAtBeginningOfLine = true;
   }
 
 protected:
-  Derived * derived() { return static_cast<Derived *>(this); }
+  IndentingEmitter() {
+    static_assert(detail::IndentingEmitterDerived<Derived>);
+  }
+
+  Derived *derived() { return static_cast<Derived *>(this); }
 
   void emitIndentationIfNeeded() {
     if (IsAtBeginningOfLine) {
