@@ -20,8 +20,8 @@ class IndentingEmitter {
 
 public:
   void indent(int Offset) {
-    if (Offset < 0)
-      revng_assert(Indentation >= static_cast<unsigned>(-Offset));
+    revng_assert(Offset >= 0 or static_cast<unsigned>(-Offset) <= Indentation,
+                 "Offset would result in negative indentation.");
 
     Indentation += static_cast<unsigned>(Offset);
   }
