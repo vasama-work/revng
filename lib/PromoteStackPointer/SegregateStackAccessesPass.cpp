@@ -1379,7 +1379,7 @@ private:
 
     CallInst *InitLocalSPCall = findCallTo(&F, InitLocalSP);
 
-    if (InitLocalSPCall == nullptr or ModelFunction.StackFrameType().isEmpty())
+    if (InitLocalSPCall == nullptr or ModelFunction.StackFrame().Type().isEmpty())
       return;
 
     //

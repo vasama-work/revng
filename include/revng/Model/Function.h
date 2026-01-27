@@ -28,32 +28,24 @@ public:
   using generated::Function::Function;
 
 public:
-  UpcastablePointer<model::Type> &StackFrameType() {
-    return StackFrame().Type();
-  }
-
-  const UpcastablePointer<model::Type> &StackFrameType() const {
-    return StackFrame().Type();
-  }
-
   /// The helper for stack frame type unwrapping.
   /// Use this when you need to access/modify the existing struct,
-  /// and \ref StackFrameType() when you need to assign a new one.
+  /// and \ref StackFrame().Type() when you need to assign a new one.
   model::StructDefinition *stackFrameType() {
-    if (StackFrameType().isEmpty())
+    if (StackFrame().Type().isEmpty())
       return nullptr;
     else
-      return StackFrameType()->getStruct();
+      return StackFrame().Type()->getStruct();
   }
 
   /// The helper for stack argument type unwrapping.
   /// Use this when you need to access/modify the existing struct,
-  /// and \ref StackFrameType() when you need to assign a new one.
+  /// and \ref StackFrame().Type() when you need to assign a new one.
   const model::StructDefinition *stackFrameType() const {
-    if (StackFrameType().isEmpty())
+    if (StackFrame().Type().isEmpty())
       return nullptr;
     else
-      return StackFrameType()->getStruct();
+      return StackFrame().Type()->getStruct();
   }
 
 public:
