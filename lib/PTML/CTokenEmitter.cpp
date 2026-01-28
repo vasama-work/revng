@@ -228,6 +228,8 @@ static StringEscape getStringEscape(char Character) {
 
 } // namespace
 
+//===---------------------------- CTokenEmitter ---------------------------===//
+
 void CTokenEmitter::emitKeyword(Keyword K) {
   auto Emit = [this](llvm::StringRef String) {
     auto Tag = PTML.initializeOpenTag(ptml::tags::Span);
@@ -535,100 +537,6 @@ void CTokenEmitter::emitStringLiteral(llvm::StringRef String) {
   PTML.emitLiteralContent("\"");
 }
 
-void CTokenEmitter::enterCommentImpl(CommentEmitter &Comment) {
-  revng_assert(CurrentCommentEmitter == nullptr);
-  CurrentCommentEmitter = &Comment;
-
-  Comment.Tag.initializeOpenTag(PTML, ptml::tags::Span);
-  Comment.Tag.emitAttribute(ptml::attributes::Token, ptml::tokens::Comment);
-  Comment.Tag.finalizeOpenTag();
-
-  switch (Comment.Kind) {
-  case CommentKind::Line:
-    PTML.emitLiteralContent("//");
-    break;
-
-  case CommentKind::Block:
-    PTML.emitLiteralContent("/*");
-    break;
-  }
-
-  Comment.IsAtBeginningOfLine = false;
-}
-
-void CTokenEmitter::leaveCommentImpl(CommentEmitter &Comment) {
-  revng_assert(CurrentCommentEmitter == &Comment);
-  CurrentCommentEmitter = nullptr;
-
-  switch (Comment.Kind) {
-  case CommentKind::Line:
-    if (not Comment.IsAtBeginningOfLine)
-      PTML.emitContentNewline();
-    break;
-
-  case CommentKind::Block:
-    PTML.emitLiteralContent("*/");
-    break;
-  }
-
-  Comment.Tag.close();
-}
-
-void CTokenEmitter::emitCommentLineStartImpl(CommentEmitter &Comment) {
-  switch (Comment.Kind) {
-  case CommentKind::Line:
-    PTML.emitLiteralContent("//");
-    break;
-
-  case CommentKind::Block:
-    break;
-  }
-}
-
-void CTokenEmitter::emitEscapedCommentContentImpl(CommentEmitter &Comment,
-                                                  llvm::StringRef Content) {
-  revng_assert(not Content.empty());
-
-  if (Comment.IsAtBeginningOfLine) {
-    emitCommentLineStartImpl(Comment);
-    Comment.IsAtBeginningOfLine = false;
-  }
-
-  switch (Comment.Kind) {
-  case CommentKind::Line:
-    PTML.emitContent(Content);
-    break;
-
-  case CommentKind::Block:
-    for (auto [I, R] : llvm::enumerate(std::views::split(Content, "*/"))) {
-      if (I != 0)
-        PTML.emitLiteralContent("  ");
-
-      PTML.emitContent(std::string_view(R.begin(), R.end()));
-    }
-    break;
-  }
-}
-
-void CTokenEmitter::emitCommentContentImpl(CommentEmitter &Comment,
-                                           llvm::StringRef Content) {
-  revng_assert(CurrentCommentEmitter == &Comment);
-
-  if (not Content.empty()) {
-    for (auto [I, R] : llvm::enumerate(std::views::split(Content, '\n'))) {
-      llvm::StringRef Line = std::string_view(R.begin(), R.end());
-
-      if (I != 0)
-        PTML.emitContentNewline();
-
-      if (not Line.empty())
-        emitEscapedCommentContentImpl(Comment, Line);
-    }
-
-    Comment.IsAtBeginningOfLine = Content.back() == '\n';
-  }
-}
-
 void CTokenEmitter::emitComment(llvm::StringRef Content, CommentKind Kind) {
   emitComment(Kind).emitContent(Content);
 }
@@ -702,4 +610,96 @@ void CTokenEmitter::enterRegionImpl(ptml::Emitter::TagEmitter &Tag,
                     getActionContextLocation(Location));
   Tag.emitListAttribute(ptml::attributes::AllowedActions, Actions);
   Tag.finalizeOpenTag();
+}
+
+//===-------------------- CTokenEmitter::CommentEmitter -------------------===//
+
+CTokenEmitter::CommentEmitter::CommentEmitter(CTokenEmitter &Emitter,
+                                              CommentKind Kind) :
+  Emitter(Emitter), Kind(Kind) {
+
+  revng_assert(not Emitter.IsEmittingComment);
+  Emitter.IsEmittingComment = true;
+
+  Tag.initializeOpenTag(Emitter.PTML, ptml::tags::Span);
+  Tag.emitAttribute(ptml::attributes::Token, ptml::tokens::Comment);
+  Tag.finalizeOpenTag();
+
+  switch (Kind) {
+  case CommentKind::Line:
+    Emitter.PTML.emitLiteralContent("//");
+    break;
+
+  case CommentKind::Block:
+    Emitter.PTML.emitLiteralContent("/*");
+    break;
+  }
+}
+
+CTokenEmitter::CommentEmitter::~CommentEmitter() {
+  switch (Kind) {
+  case CommentKind::Line:
+    if (not IsAtBeginningOfLine)
+      Emitter.PTML.emitContentNewline();
+    break;
+
+  case CommentKind::Block:
+    Emitter.PTML.emitLiteralContent("*/");
+    break;
+  }
+
+  Tag.close();
+
+  Emitter.IsEmittingComment = false;
+}
+
+void CTokenEmitter::CommentEmitter::emitContent(llvm::StringRef Content) {
+  if (not Content.empty()) {
+    for (auto [I, R] : llvm::enumerate(std::views::split(Content, '\n'))) {
+      llvm::StringRef Line = std::string_view(R.begin(), R.end());
+
+      if (I != 0)
+        Emitter.PTML.emitContentNewline();
+
+      if (not Line.empty())
+        emitEscaped(Line);
+    }
+
+    IsAtBeginningOfLine = Content.back() == '\n';
+  }
+}
+
+void CTokenEmitter::CommentEmitter::emitLinePrefix() {
+  switch (Kind) {
+  case CommentKind::Line:
+    Emitter.PTML.emitLiteralContent("//");
+    break;
+
+  case CommentKind::Block:
+    break;
+  }
+}
+
+void CTokenEmitter::CommentEmitter::emitEscaped(llvm::StringRef Content) {
+  revng_assert(not Content.empty());
+
+  if (IsAtBeginningOfLine) {
+    emitLinePrefix();
+    IsAtBeginningOfLine = false;
+  }
+
+  switch (Kind) {
+  case CommentKind::Line:
+    Emitter.PTML.emitContent(Content);
+    break;
+
+  case CommentKind::Block:
+    for (auto [I, R] : llvm::enumerate(std::views::split(Content, "*/"))) {
+      if (I != 0)
+        Emitter.PTML.emitLiteralContent("  ");
+
+      Emitter.PTML.emitContent(std::string_view(R.begin(), R.end()));
+    }
+    break;
+  }
 }

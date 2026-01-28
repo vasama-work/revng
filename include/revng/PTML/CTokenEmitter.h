@@ -15,8 +15,13 @@ public:
   class CommentEmitter;
 
 private:
+  // It is very important to hide the PTML emitter and not to expose any direct
+  // access to it in the public interface of this class. This design prevents
+  // the emission of lexically invalid C.
   ptml::Emitter PTML;
-  CommentEmitter *CurrentCommentEmitter = nullptr;
+
+  // Used to ensure that only one comment emitter may exist at any given time.
+  bool IsEmittingComment = false;
 
 public:
   explicit CTokenEmitter(llvm::raw_ostream &OS, ptml::Tagging Tags) :
@@ -184,32 +189,29 @@ public:
   };
 
   class CommentEmitter {
-    friend CTokenEmitter;
-
     CTokenEmitter &Emitter;
     CommentKind Kind;
     ptml::Emitter::TagEmitter Tag;
     bool IsAtBeginningOfLine = false;
 
   public:
-    explicit CommentEmitter(CTokenEmitter &Emitter, CommentKind Kind) :
-      Emitter(Emitter), Kind(Kind) {
-      Emitter.enterCommentImpl(*this);
-    }
+    explicit CommentEmitter(CTokenEmitter &Emitter, CommentKind Kind);
 
     CommentEmitter(const CommentEmitter &) = delete;
     CommentEmitter &operator=(const CommentEmitter &) = delete;
 
-    ~CommentEmitter() { Emitter.leaveCommentImpl(*this); }
+    ~CommentEmitter();
 
     [[nodiscard]] ptml::Emitter::TagEmitter
     initializeOpenTag(llvm::StringRef Tag) {
       return ptml::Emitter::TagEmitter(Emitter.PTML, Tag);
     }
 
-    void emitContent(llvm::StringRef Content) {
-      Emitter.emitCommentContentImpl(*this, Content);
-    }
+    void emitContent(llvm::StringRef Content);
+
+  private:
+    void emitLinePrefix();
+    void emitEscaped(llvm::StringRef Content);
   };
 
   [[nodiscard]] CommentEmitter emitComment(CommentKind Kind) {
@@ -294,14 +296,6 @@ public:
   }
 
 private:
-  void enterCommentImpl(CommentEmitter &Comment);
-  void leaveCommentImpl(CommentEmitter &Comment);
-
-  void emitCommentLineStartImpl(CommentEmitter &Comment);
-  void emitEscapedCommentContentImpl(CommentEmitter &Comment,
-                                     llvm::StringRef Content);
-  void emitCommentContentImpl(CommentEmitter &Comment, llvm::StringRef Content);
-
   void enterScopeImpl(ptml::Emitter::TagEmitter &Tag,
                       Delimiter Delimiter,
                       int Indent,
