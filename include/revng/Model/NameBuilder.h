@@ -137,7 +137,7 @@ private:
 
   [[nodiscard]] std::string
   automaticName(const model::StackFrame &StackFrame) const {
-    std::string Result = Configuration.StackFrameVariableName();
+    std::string Result = Configuration.UnnamedStackFrameVariableName();
     assertNameIsReserved(Result);
     return Result;
   }
