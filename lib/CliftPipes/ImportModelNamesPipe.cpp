@@ -25,16 +25,10 @@ namespace {
 struct StatementGraphTraits {
   using StatementType = mlir::Operation *;
 
-  static auto getOperationsOrEmpty(mlir::Block *Block) {
-    revng_assert(Block != nullptr); // WIP
+  static auto getStatements(mlir::Block *Block) {
     using Iterator = mlir::Block::OpListType::iterator;
     using IteratorRange = llvm::iterator_range<Iterator>;
-    return Block != nullptr ? IteratorRange(Block->getOperations()) :
-                              IteratorRange(Iterator(), Iterator());
-  }
-
-  static auto getStatements(mlir::Block *Block) {
-    return llvm::map_range(getOperationsOrEmpty(Block),
+    return llvm::map_range(IteratorRange(Block->getOperations()),
                            [](mlir::Operation &Op) { return &Op; });
   }
 
