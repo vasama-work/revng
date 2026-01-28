@@ -711,6 +711,8 @@ public:
       });
       CurrentPrecedence = Info.Precedence;
 
+      // If an expression location is available, within this scope an expression
+      // region is entered.
       std::optional<CTE::Region> Region;
       if (auto Location = getExpressionLocation(V))
         Region.emplace(C, CTE::RegionKind::Expression, *Location);
@@ -1067,6 +1069,8 @@ public:
     mlir::Operation *Op = Stmt.getOperation();
 
     if (auto Comments = getComments(Stmt)) {
+      // TODO: Add a comment formatting layer on top of CE.
+      //       At least spaces at the start of each line would be nice.
       auto CE = C.emitComment(CTE::CommentKind::Line);
 
       for (mlir::Attribute CommentAttr : Comments) {
