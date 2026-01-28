@@ -70,6 +70,11 @@ def CliftVerifyC : Clift_Pass<"verify-c", "mlir::ModuleOp"> {
   let constructor = "mlir::clift::createVerifyCPass()";
 }
 
+def CliftAutoName : Clift_Pass<"auto-name", "mlir::ModuleOp"> {
+  let summary = "Add automatic names for all nameable entities.";
+  let constructor = "mlir::clift::createAutoNamePass()";
+}
+
 def CliftEmitC : Clift_Pass<"emit-c", "mlir::ModuleOp"> {
   let summary = "Emit C code (optionally with PTML tags) from the Clift code.";
   let constructor = "mlir::clift::createEmitCPass()";

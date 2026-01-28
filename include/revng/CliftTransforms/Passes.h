@@ -33,6 +33,7 @@ createCLegalizationPass(const TargetCImplementation &Target);
 PassPtr<clift::FunctionOp> createImmediateRadixDeductionPass();
 
 PassPtr<mlir::ModuleOp> createVerifyCPass();
+PassPtr<mlir::ModuleOp> createAutoNamePass();
 PassPtr<mlir::ModuleOp> createEmitCPass();
 
 #define GEN_PASS_REGISTRATION
