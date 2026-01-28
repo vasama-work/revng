@@ -90,6 +90,10 @@ public:
     auto Attr = getOfType<mlir::StringAttr>(Name);
     return Attr ? Attr.getValue() : Default;
   }
+
+  [[nodiscard]] llvm::StringRef getStringOrEmpty(llvm::StringRef Name) const {
+    return getString(Name, llvm::StringRef());
+  }
 };
 
 } // namespace mlir::clift
