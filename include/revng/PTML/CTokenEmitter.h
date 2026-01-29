@@ -189,7 +189,10 @@ public:
   };
 
   class CommentEmitter {
-    CTokenEmitter &Emitter;
+    // A single reference to CTokenEmitter would be fine, but we don't do that.
+    ptml::Emitter &PTML;
+    bool &IsEmittingComment;
+
     CommentKind Kind;
     ptml::Emitter::TagEmitter Tag;
     bool IsAtBeginningOfLine = false;
@@ -204,7 +207,7 @@ public:
 
     [[nodiscard]] ptml::Emitter::TagEmitter
     initializeOpenTag(llvm::StringRef Tag) {
-      return ptml::Emitter::TagEmitter(Emitter.PTML, Tag);
+      return ptml::Emitter::TagEmitter(PTML, Tag);
     }
 
     void emitContent(llvm::StringRef Content);
