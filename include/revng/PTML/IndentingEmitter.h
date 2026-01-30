@@ -12,22 +12,18 @@
 #include "revng/Support/Assert.h"
 
 namespace ptml {
-namespace detail {
 
-template<typename Derived>
-concept IndentingEmitterDerived = requires (Derived &D) {
-  D.emitLiteral(llvm::StringRef());
-  D.emitIndentation(static_cast<unsigned>(0));
-};
-
-} // namespace detail
-
-template<typename Derived>
-class IndentingEmitter {
+template<typename EmitterT, typename TraitsT>
+class IndentingEmitter : protected EmitterT {
   unsigned Indentation = 0;
   bool IsAtBeginningOfLine = true;
 
 public:
+  template<typename... ArgsT>
+    requires std::constructible_from<EmitterT, ArgsT...>
+  explicit IndentingEmitter(ArgsT &&...Args) :
+    EmitterT(std::forward<ArgsT>(Args)...) {}
+
   void indent(int Offset) {
     revng_assert(Offset >= 0 or static_cast<unsigned>(-Offset) <= Indentation,
                  "Offset would result in negative indentation.");
@@ -47,45 +43,27 @@ public:
         if (I != 0)
           emitNewline();
 
-        if (not Line.empty())
-          emitLiteralImpl(Line);
+        if (not Line.empty()) {
+          emitIndentationIfNeeded();
+          EmitterT::emit(Line);
+        }
       }
 
       IsAtBeginningOfLine = String.back() == '\n';
     }
   }
 
-  void emitLiteral(llvm::StringRef String) {
-    if (not String.empty()) {
-      revng_assert(not String.contains('\n'));
-      emitLiteralImpl(String);
-    }
-  }
-
   void emitNewline() {
-    derived()->emitLiteral(llvm::StringRef("\n"));
+    EmitterT::emit(llvm::StringRef("\n"));
     IsAtBeginningOfLine = true;
   }
 
 protected:
-  IndentingEmitter() {
-    static_assert(detail::IndentingEmitterDerived<Derived>);
-  }
-
-  Derived *derived() { return static_cast<Derived *>(this); }
-
   void emitIndentationIfNeeded() {
     if (IsAtBeginningOfLine) {
       IsAtBeginningOfLine = false;
-      derived()->emitIndentation(Indentation);
+      TraitsT::emitIndentation(static_cast<EmitterT &>(*this), Indentation);
     }
-  }
-
-private:
-  void emitLiteralImpl(llvm::StringRef String) {
-    revng_assert(not String.empty());
-    emitIndentationIfNeeded();
-    derived()->emitLiteral(String);
   }
 };
 

@@ -18,7 +18,7 @@ private:
   // It is very important to hide the PTML emitter and not to expose any direct
   // access to it in the public interface of this class. This design prevents
   // the emission of lexically invalid C.
-  ptml::Emitter PTML;
+  ptml::IndentingPTMLEmitter PTML;
 
   // Used to ensure that only one comment emitter may exist at any given time.
   bool IsEmittingComment = false;
@@ -27,9 +27,9 @@ public:
   explicit CTokenEmitter(llvm::raw_ostream &OS, ptml::Tagging Tags) :
     PTML(OS, Tags) {}
 
-  void emitSpace() { PTML.emitLiteralContent(" "); }
+  void emitSpace() { PTML.emit(" "); }
 
-  void emitNewline() { PTML.emitContentNewline(); }
+  void emitNewline() { PTML.emit("\n"); }
 
   enum class Keyword {
     Auto,
@@ -190,11 +190,11 @@ public:
 
   class CommentEmitter {
     // A single reference to CTokenEmitter would be fine, but we don't do that.
-    ptml::Emitter &PTML;
+    ptml::IndentingPTMLEmitter &PTML;
     bool &IsEmittingComment;
 
     CommentKind Kind;
-    ptml::Emitter::TagEmitter Tag;
+    ptml::IndentingPTMLEmitter::TagEmitter Tag;
     bool IsAtBeginningOfLine = false;
 
   public:
@@ -205,12 +205,31 @@ public:
 
     ~CommentEmitter();
 
-    [[nodiscard]] ptml::Emitter::TagEmitter
+    class TagEmitter : ptml::IndentingPTMLEmitter::TagEmitter {
+      using BaseType = ptml::IndentingPTMLEmitter::TagEmitter;
+
+    public:
+      explicit TagEmitter(CommentEmitter &Emitter, llvm::StringRef Tag) :
+        BaseType(Emitter, Tag) {}
+
+      using BaseType::initializeOpenTag(CommentEmitter &Emitter) {
+        BaseType::initializeOpenTag(Emitter);
+      }
+
+      using BaseType::emitAttribute;
+      using BaseType::emitListAttribute;
+      using BaseType::isOpenTagFinalized;
+      using BaseType::finalizeOpenTag;
+      using BaseType::isOpen;
+      using BaseType::close;
+    };
+
+    [[nodiscard]] ptml::IndentingPTMLEmitter::TagEmitter
     initializeOpenTag(llvm::StringRef Tag) {
-      return ptml::Emitter::TagEmitter(PTML, Tag);
+      return ptml::IndentingPTMLEmitter::TagEmitter(PTML, Tag);
     }
 
-    void emitContent(llvm::StringRef Content);
+    void emit(llvm::StringRef Content);
 
   private:
     void emitLinePrefix();
@@ -268,7 +287,7 @@ public:
     Delimiter Delimiter;
     int Indent;
 
-    ptml::Emitter::TagEmitter Tag;
+    ptml::IndentingPTMLEmitter::TagEmitter Tag;
   };
 
   [[nodiscard]] Scope
@@ -281,7 +300,7 @@ public:
   };
 
   class Region {
-    ptml::Emitter::TagEmitter Tag;
+    ptml::IndentingPTMLEmitter::TagEmitter Tag;
 
   public:
     explicit Region(CTokenEmitter &Emitter,
@@ -299,16 +318,16 @@ public:
   }
 
 private:
-  void enterScopeImpl(ptml::Emitter::TagEmitter &Tag,
+  void enterScopeImpl(ptml::IndentingPTMLEmitter::TagEmitter &Tag,
                       Delimiter Delimiter,
                       int Indent,
                       ScopeKind Kind);
 
-  void leaveScopeImpl(ptml::Emitter::TagEmitter &Tag,
+  void leaveScopeImpl(ptml::IndentingPTMLEmitter::TagEmitter &Tag,
                       Delimiter Delimiter,
                       int Indent);
 
-  void enterRegionImpl(ptml::Emitter::TagEmitter &Tag,
+  void enterRegionImpl(ptml::IndentingPTMLEmitter::TagEmitter &Tag,
                        RegionKind Kind,
                        llvm::StringRef Location);
 };

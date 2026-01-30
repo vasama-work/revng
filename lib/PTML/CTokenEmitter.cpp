@@ -236,7 +236,7 @@ void CTokenEmitter::emitKeyword(Keyword K) {
     Tag.emitAttribute(ptml::attributes::Token, ptml::c::tokens::Keyword);
     Tag.finalizeOpenTag();
 
-    PTML.emitLiteralContent(String);
+    PTML.emit(String);
   };
 
   switch (K) {
@@ -317,29 +317,29 @@ void CTokenEmitter::emitKeyword(Keyword K) {
 void CTokenEmitter::emitPunctuator(Punctuator P) {
   switch (P) {
   case Punctuator::Colon:
-    return PTML.emitContent(":");
+    return PTML.emit(":");
   case Punctuator::Comma:
-    return PTML.emitContent(",");
+    return PTML.emit(",");
   case Punctuator::Dot:
-    return PTML.emitContent(".");
+    return PTML.emit(".");
   case Punctuator::Equals:
-    return PTML.emitContent("=");
+    return PTML.emit("=");
   case Punctuator::LeftBrace:
-    return PTML.emitContent("{");
+    return PTML.emit("{");
   case Punctuator::LeftBracket:
-    return PTML.emitContent("[");
+    return PTML.emit("[");
   case Punctuator::LeftParenthesis:
-    return PTML.emitContent("(");
+    return PTML.emit("(");
   case Punctuator::RightBrace:
-    return PTML.emitContent("}");
+    return PTML.emit("}");
   case Punctuator::RightBracket:
-    return PTML.emitContent("]");
+    return PTML.emit("]");
   case Punctuator::RightParenthesis:
-    return PTML.emitContent(")");
+    return PTML.emit(")");
   case Punctuator::Semicolon:
-    return PTML.emitContent(";");
+    return PTML.emit(";");
   case Punctuator::Star:
-    return PTML.emitContent("*");
+    return PTML.emit("*");
   }
   revng_abort("Invalid CTokenEmitter::Punctuator");
 }
@@ -350,7 +350,7 @@ void CTokenEmitter::emitOperator(Operator O) {
     Tag.emitAttribute(ptml::attributes::Token, ptml::c::tokens::Operator);
     Tag.finalizeOpenTag();
 
-    PTML.emitContent(String);
+    PTML.emit(String);
   };
 
   switch (O) {
@@ -468,14 +468,14 @@ void CTokenEmitter::emitIdentifier(llvm::StringRef Identifier,
   }
   Tag.finalizeOpenTag();
 
-  PTML.emitLiteralContent(Identifier);
+  PTML.emit(Identifier);
 }
 
 void CTokenEmitter::emitLiteralIdentifier(llvm::StringRef Identifier) {
   revng_assert(validateIdentifier(Identifier),
                "The specified identifier is not a valid C identifier.");
 
-  PTML.emitLiteralContent(Identifier);
+  PTML.emit(Identifier);
 }
 
 void CTokenEmitter::emitIntegerLiteral(llvm::APSInt Value,
@@ -508,7 +508,7 @@ void CTokenEmitter::emitIntegerLiteral(llvm::APSInt Value,
   Tag.emitAttribute(ptml::attributes::Token, ptml::c::tokens::Constant);
   Tag.finalizeOpenTag();
 
-  PTML.emitLiteralContent(String);
+  PTML.emit(String);
 }
 
 void CTokenEmitter::emitStringLiteral(llvm::StringRef String) {
@@ -516,7 +516,7 @@ void CTokenEmitter::emitStringLiteral(llvm::StringRef String) {
   Tag.emitAttribute(ptml::attributes::Token, ptml::c::tokens::StringLiteral);
   Tag.finalizeOpenTag();
 
-  PTML.emitLiteralContent("\"");
+  PTML.emit("\"");
 
   auto Begin = String.data();
   auto End = Begin + String.size();
@@ -526,19 +526,19 @@ void CTokenEmitter::emitStringLiteral(llvm::StringRef String) {
       return requiresStringEscaping(Character);
     });
 
-    PTML.emitContent(std::string_view(Begin, Pos));
+    PTML.emit(std::string_view(Begin, Pos));
 
     if (Pos != End)
-      PTML.emitLiteralContent(getStringEscape(*Pos++));
+      PTML.emit(getStringEscape(*Pos++));
 
     Begin = Pos;
   }
 
-  PTML.emitLiteralContent("\"");
+  PTML.emit("\"");
 }
 
 void CTokenEmitter::emitComment(llvm::StringRef Content, CommentKind Kind) {
-  emitComment(Kind).emitContent(Content);
+  emitComment(Kind).emit(Content);
 }
 
 void CTokenEmitter::emitIncludeDirective(llvm::StringRef Content,
@@ -550,10 +550,10 @@ void CTokenEmitter::emitIncludeDirective(llvm::StringRef Content,
     Tag.emitAttribute(ptml::attributes::Token, ptml::c::tokens::Directive);
     Tag.finalizeOpenTag();
 
-    PTML.emitLiteralContent("#include");
+    PTML.emit("#include");
   }
 
-  PTML.emitLiteralContent(" ");
+  PTML.emit(" ");
 
   // Emit include path:
   {
@@ -561,12 +561,12 @@ void CTokenEmitter::emitIncludeDirective(llvm::StringRef Content,
     Tag.emitAttribute(ptml::attributes::Token, ptml::c::tokens::StringLiteral);
     Tag.finalizeOpenTag();
 
-    PTML.emitContent(Mode == IncludeMode::Quote ? "\"" : "<");
-    PTML.emitContent(Content);
-    PTML.emitContent(Mode == IncludeMode::Quote ? "\"" : ">");
+    PTML.emit(Mode == IncludeMode::Quote ? "\"" : "<");
+    PTML.emit(Content);
+    PTML.emit(Mode == IncludeMode::Quote ? "\"" : ">");
   }
 
-  PTML.emitContentNewline();
+  PTML.emit("\n");
 }
 
 void CTokenEmitter::enterScopeImpl(ptml::Emitter::TagEmitter &Tag,
@@ -629,11 +629,11 @@ CTokenEmitter::CommentEmitter::CommentEmitter(CTokenEmitter &Emitter,
 
   switch (Kind) {
   case CommentKind::Line:
-    PTML.emitLiteralContent("//");
+    PTML.emit("//");
     break;
 
   case CommentKind::Block:
-    PTML.emitLiteralContent("/*");
+    PTML.emit("/*");
     break;
   }
 }
@@ -642,11 +642,11 @@ CTokenEmitter::CommentEmitter::~CommentEmitter() {
   switch (Kind) {
   case CommentKind::Line:
     if (not IsAtBeginningOfLine)
-      PTML.emitContentNewline();
+      PTML.emit("\n");
     break;
 
   case CommentKind::Block:
-    PTML.emitLiteralContent("*/");
+    PTML.emit("*/");
     break;
   }
 
@@ -655,13 +655,13 @@ CTokenEmitter::CommentEmitter::~CommentEmitter() {
   IsEmittingComment = false;
 }
 
-void CTokenEmitter::CommentEmitter::emitContent(llvm::StringRef Content) {
+void CTokenEmitter::CommentEmitter::emit(llvm::StringRef Content) {
   if (not Content.empty()) {
     for (auto [I, R] : llvm::enumerate(std::views::split(Content, '\n'))) {
       llvm::StringRef Line = std::string_view(R.begin(), R.end());
 
       if (I != 0)
-        PTML.emitContentNewline();
+        PTML.emit("\n");
 
       if (not Line.empty())
         emitEscaped(Line);
@@ -674,7 +674,7 @@ void CTokenEmitter::CommentEmitter::emitContent(llvm::StringRef Content) {
 void CTokenEmitter::CommentEmitter::emitLinePrefix() {
   switch (Kind) {
   case CommentKind::Line:
-    PTML.emitLiteralContent("//");
+    PTML.emit("//");
     break;
 
   case CommentKind::Block:
@@ -692,15 +692,15 @@ void CTokenEmitter::CommentEmitter::emitEscaped(llvm::StringRef Content) {
 
   switch (Kind) {
   case CommentKind::Line:
-    PTML.emitContent(Content);
+    PTML.emit(Content);
     break;
 
   case CommentKind::Block:
     for (auto [I, R] : llvm::enumerate(std::views::split(Content, "*/"))) {
       if (I != 0)
-        PTML.emitLiteralContent("  ");
+        PTML.emit("  ");
 
-      PTML.emitContent(std::string_view(R.begin(), R.end()));
+      PTML.emit(std::string_view(R.begin(), R.end()));
     }
     break;
   }

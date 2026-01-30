@@ -4,7 +4,6 @@
 // This file is distributed under the MIT License. See LICENSE.md for details.
 //
 
-#include "revng/PTML/CommentEmitter.h"
 #include "revng/PTML/Constants.h"
 
 namespace ptml {
@@ -16,68 +15,77 @@ struct DoxygenCommentConfiguration {
   llvm::StringRef LinePrefix;
 };
 
-template<CommentEmitter CommentEmitterT>
-class DoxygenCommentEmitter
-  : IndentingEmitter<DoxygenCommentEmitter<CommentEmitterT>> {
+namespace detail {
 
-  friend IndentingEmitter<DoxygenCommentEmitter<CommentEmitterT>>;
+struct DoxygenIndentationTraits;
 
-  static constexpr llvm::StringRef IndentString = "  ";
+template<typename EmitterT>
+class DoxygenEmitterBase : protected EmitterT {
+protected:
+  DoxygenCommentConfiguration Configuration;
 
-  CommentEmitterT Emitter;
+  template<typename... ArgsT>
+    requires std::constructible_from<EmitterT, ArgsT...>
+  explicit DoxygenEmitterBase(const DoxygenCommentConfiguration &Configuration,
+                              ArgsT &&...Args) :
+    EmitterT(std::forward<ArgsT>(Args)...), Configuration(Configuration) {}
+
+  friend DoxygenIndentationTraits;
+};
+
+struct DoxygenIndentationTraits {
+  template<Emitter EmitterT>
+  void emitIndentation(DoxygenEmitterBase<EmitterT> &Emitter,
+                       unsigned Indentation) {
+    Emitter.emit(Emitter.Configuration.LinePrefix);
+    for (unsigned I = 0, C = Indentation; I < C; ++I)
+      Emitter.emit("  ");
+  }
+};
+
+} // namespace detail
+
+template<PTMLEmitter EmitterT>
+class DoxygenEmitter
+  : IndentingEmitter<EmitterT, detail::DoxygenIndentationTraits> {
+
+  using BaseType = IndentingEmitter<EmitterT, detail::DoxygenIndentationTraits>;
+
   DoxygenCommentConfiguration Configuration;
 
 public:
   template<typename... ArgsT>
-    requires std::constructible_from<CommentEmitterT, ArgsT...>
-  explicit DoxygenCommentEmitter(DoxygenCommentConfiguration Configuration,
-                                 ArgsT &&...Args) :
-    Emitter(std::forward<ArgsT>(Args)...), Configuration(Configuration) {
+    requires std::constructible_from<EmitterT, ArgsT...>
+  explicit DoxygenEmitter(const DoxygenCommentConfiguration &Configuration,
+                          ArgsT &&...Args) :
+    BaseType(Configuration, std::forward<ArgsT>(Args)...) {
     if (Configuration.CommentHeader) {
-      Emitter.emitContent(*Configuration.CommentHeader);
-      IndentingEmitter<DoxygenCommentEmitter>::emitNewline();
+      EmitterT::emit(*Configuration.CommentHeader);
+      BaseType::emit("\n");
     }
   }
 
   void emitKeyword(llvm::StringRef Keyword) {
-    auto Tag = Emitter.initializeOpenTag(ptml::tags::Span);
+    auto Tag = EmitterT::initializeOpenTag(ptml::tags::Span);
     Tag.emitAttribute(ptml::attributes::Token, ptml::doxygen::tokens::Keyword);
     Tag.finalizeOpenTag();
 
-    llvm::StringRef Signifier(&Configuration.KeywordSignifier, 1);
-    IndentingEmitter<DoxygenCommentEmitter>::emit(Signifier);
-    IndentingEmitter<DoxygenCommentEmitter>::emit(Keyword);
+    BaseType::emit(llvm::StringRef(&Configuration.KeywordSignifier, 1));
+    BaseType::emit(Keyword);
   }
 
-  DoxygenCommentEmitter(const DoxygenCommentEmitter &) = delete;
-  DoxygenCommentEmitter &operator=(const DoxygenCommentEmitter &) = delete;
+  DoxygenEmitter(const DoxygenEmitter &) = delete;
+  DoxygenEmitter &operator=(const DoxygenEmitter &) = delete;
 
-  ~DoxygenCommentEmitter() {
+  ~DoxygenEmitter() {
     if (Configuration.CommentFooter) {
-      if (not IndentingEmitter<DoxygenCommentEmitter>::isAtBeginningOfLine())
-        IndentingEmitter<DoxygenCommentEmitter>::emitNewline();
-      Emitter.emitContent(*Configuration.CommentFooter);
+      if (not BaseType::isAtBeginningOfLine())
+        BaseType::emit("\n");
+      EmitterT::emit(*Configuration.CommentFooter);
     }
   }
 
-  void emitContent(llvm::StringRef Content) {
-    IndentingEmitter<DoxygenCommentEmitter>::emit(Content);
-  }
-
-  void emitContentNewline() {
-    IndentingEmitter<DoxygenCommentEmitter>::emitNewline();
-  }
-
-private:
-  //===-------------------- IndentingEmitter interface --------------------===//
-
-  void emitLiteral(llvm::StringRef String) { Emitter.emitContent(String); }
-
-  void emitIndentation(unsigned Indentation) {
-    Emitter.emitContent(Configuration.LinePrefix);
-    for (unsigned I = 0, C = Indentation; I < C; ++I)
-      Emitter.emitContent(IndentString);
-  }
+  using BaseType::emit;
 };
 
 } // namespace ptml

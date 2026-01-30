@@ -8,23 +8,17 @@
 #include "revng/PTML/DoxygenEmitter.h"
 
 namespace ptml {
-namespace detail {
 
-// Short enough to fit within the column limit...
-using CDoxComEmitter = DoxygenCommentEmitter<CTokenEmitter::CommentEmitter>;
+using CDoxygenEmitter = DoxygenEmitter<CTokenEmitter::CommentEmitter>;
 
-} // namespace detail
-
-using CDoxygenCommentEmitter = detail::CDoxComEmitter;
-
-[[nodiscard]] inline CDoxygenCommentEmitter
+[[nodiscard]] inline CDoxygenEmitter
 emitDoxygenLineComment(CTokenEmitter &CE) {
-  return CDoxygenCommentEmitter({ .LinePrefix = "/ " },
-                                CE,
-                                CTokenEmitter::CommentKind::Line);
+  return CDoxygenEmitter({ .LinePrefix = "/ " },
+                         CE,
+                         CTokenEmitter::CommentKind::Line);
 }
 
-[[nodiscard]] inline CDoxygenCommentEmitter
+[[nodiscard]] inline CDoxygenEmitter
 emitDoxygenBlockComment(CTokenEmitter &CE) {
   DoxygenCommentConfiguration Configuration = {
     .CommentHeader = "*",
@@ -32,9 +26,9 @@ emitDoxygenBlockComment(CTokenEmitter &CE) {
     .LinePrefix = " * ",
   };
 
-  return CDoxygenCommentEmitter(Configuration,
-                                CE,
-                                CTokenEmitter::CommentKind::Block);
+  return CDoxygenEmitter(Configuration,
+                         CE,
+                         CTokenEmitter::CommentKind::Block);
 }
 
 } // namespace ptml
