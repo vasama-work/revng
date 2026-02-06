@@ -4,8 +4,13 @@ void doSomething(int x) {
 
   0; // int; rvalue (may only appear on the *right* side of an assignment).
 
+  //   valid: ++x
   // invalid: ++0
+
+  //   valid: x = 0
   // invalid: 0 = 0
+
+  //   valid: &x
   // invalid: &0
 
 }

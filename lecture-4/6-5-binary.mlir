@@ -1,7 +1,7 @@
 // 1 + 2;
 clift.expr {
-  %0 = clift.immediate 1 : !int32_t
-  %1 = clift.immediate 2 : !int32_t
+  %0 = clift.imm 1 : !int32_t
+  %1 = clift.imm 2 : !int32_t
   %2 = clift.add %0, %1 : !int32_t
   clift.yield %2 : !int32_t
 }
@@ -14,8 +14,8 @@ clift.expr {
 
 // 1 & 2;
 clift.expr {
-  %0 = clift.immediate 1 : !int32_t
-  %1 = clift.immediate 2 : !int32_t
+  %0 = clift.imm 1 : !int32_t
+  %1 = clift.imm 2 : !int32_t
   %2 = clift.bitand %0, %1 : !int32_t
   clift.yield %2 : !int32_t
 }
@@ -26,8 +26,8 @@ clift.expr {
 
 // 1 << 2;
 clift.expr {
-  %0 = clift.immediate 1 : !int32_t
-  %1 = clift.immediate 2 : !int32_t
+  %0 = clift.imm 1 : !int32_t
+  %1 = clift.imm 2 : !int32_t
   %2 = clift.shl %0, %1 : !int32_t
   clift.yield %2 : !int32_t
 }
@@ -40,8 +40,8 @@ clift.expr {
 
 // 1 == 2;
 clift.expr {
-  %0 = clift.immediate 1 : !int32_t
-  %1 = clift.immediate 2 : !int32_t
+  %0 = clift.imm 1 : !int32_t
+  %1 = clift.imm 2 : !int32_t
   %2 = clift.eq %0, %1 : !int32_t -> !int8_t
   clift.yield %2 : !int8_t
 }
@@ -57,7 +57,7 @@ clift.expr {
 
 // p + 1LL;
 clift.expr {
-  %0 = clift.immediate 1 : !uint64_t
+  %0 = clift.imm 1 : !uint64_t
   %1 = clift.ptr_add %p, %0 : (!clift.ptr<8 to !int32_t>, !uint64_t)
   clift.yield %1 : !clift.ptr<8 to !int32_t>
 }
@@ -74,8 +74,8 @@ clift.expr {
 
 // 1 && 2;
 clift.expr {
-  %0 = clift.immediate 1 : !int32_t
-  %1 = clift.immediate 2 : !int32_t
+  %0 = clift.imm 1 : !int32_t
+  %1 = clift.imm 2 : !int32_t
   %2 = clift.and %0, %1 : !int32_t -> !int8_t
   clift.yield %2 : !int8_t
 }
@@ -85,8 +85,8 @@ clift.expr {
 
 // 1, 2;
 clift.expr {
-  %0 = clift.immediate 1 : !int32_t
-  %1 = clift.immediate 2 : !int32_t
+  %0 = clift.imm 1 : !int32_t
+  %1 = clift.imm 2 : !int32_t
   %2 = clift.comma %0, %1 : !int32_t, !int32_t
   clift.yield %2 : !int32_t
 }

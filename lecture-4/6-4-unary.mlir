@@ -1,20 +1,20 @@
 // -42;
 clift.expr {
-  %0 = clift.immediate 42 : !int32_t
+  %0 = clift.imm 42 : !int32_t
   %1 = clift.neg %0 : !int32_t
   clift.yield %1 : !int32_t
 }
 
 // !42;
 clift.expr {
-  %0 = clift.immediate 42 : !int32_t
+  %0 = clift.imm 42 : !int32_t
   %1 = clift.not %0 : !int32_t -> !int8_t
   clift.yield %1 : !int8_t
 }
 
 // ~42;
 clift.expr {
-  %0 = clift.immediate 42 : !int32_t
+  %0 = clift.imm 42 : !int32_t
   %1 = clift.bitnot %0 : !int32_t
   clift.yield %1 : !int32_t
 }

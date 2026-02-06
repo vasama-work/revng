@@ -7,8 +7,8 @@
 
 // (my_struct){ 1, 2 };
 clift.expr {
-  %0 = clift.immediate 1 : !int32_t
-  %1 = clift.immediate 2 : !int32_t
+  %0 = clift.imm 1 : !int32_t
+  %1 = clift.imm 2 : !int32_t
   %2 = clift.aggregate (%0, %1) : !my_struct
   clift.yield %2 : !my_struct
 }
