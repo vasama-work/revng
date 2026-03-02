@@ -1311,9 +1311,9 @@ mlir::LogicalResult CastOp::verify() {
       if (not ArgUnderlyingT)
         return emitOpError() << " argument must have integer type.";
 
-      if (ResUnderlyingT.getKind() != ArgUnderlyingT.getKind())
-        return emitOpError() << " result and argument types must be equal in"
-                                " kind.";
+      //if (ResUnderlyingT.getKind() != ArgUnderlyingT.getKind())
+      //  return emitOpError() << " result and argument types must be equal in"
+      //                          " kind.";
     } else if (auto ResPointerT = getPointerType(ResT)) {
       auto ArgPointerT = getPointerType(ArgT);
       if (not ArgPointerT)

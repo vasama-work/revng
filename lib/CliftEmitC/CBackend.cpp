@@ -277,7 +277,7 @@ public:
   }
 
   static bool isHiddenCast(CastOp Cast) {
-    return Cast.getKind() == CastKind::Decay;
+    return Cast.getKind() == CastKind::Decay or Cast->hasAttr("clift.implicit");
   }
 
   static mlir::Value unwrapHiddenCasts(CastOp Cast) {

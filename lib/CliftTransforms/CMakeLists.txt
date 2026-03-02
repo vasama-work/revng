@@ -8,6 +8,7 @@ revng_add_library_internal(
   BooleanNegations.cpp
   Expressions.cpp
   ImmediateRadixDeduction.cpp
+  ImplicitCastElimination.cpp
   LabelMerging.cpp
   Legalization.cpp
   LoopDetection.cpp
