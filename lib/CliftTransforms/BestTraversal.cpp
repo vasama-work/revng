@@ -677,14 +677,14 @@ BestTraversalChooser::computeBestTraversal(ExpressionOpInterface
                                              &Arithmetic) {
   // We only perform the substitution for `PointerType`
   auto PointerToReplaceType = PointerToReplace->getResult(0).getType();
-  if (not isPointerType(PointerToReplaceType)) {
+  if (not clift::unwrapped_isa<clift::PointerType>(PointerToReplaceType)) {
     return std::nullopt;
   }
 
   // It may be that the `PointerToReplace` points to a `void 0` type, in that
   // case we cannot provide a `Traversal` for sure
-  auto BasePtrType = getPointerType(Arithmetic.BasePointer.getType());
-  revng_assert(BasePtrType);
+  auto BasePtrType = clift::unwrapped_cast<PointerType>(Arithmetic.BasePointer
+                                                          .getType());
   auto BaseType = BasePtrType.getPointeeType();
   if (getObjectSizeOrZero(BaseType) == 0) {
     return std::nullopt;
@@ -693,13 +693,16 @@ BestTraversalChooser::computeBestTraversal(ExpressionOpInterface
   // Expand to explicit array accesses the input `PointerArithmetic`, so that
   // the constant folded component performed by the compiler is evident in the
   // `LinearCombination` portion of `Arithmetic`
-  PointerBitWidth = getPointerType(PointerToReplaceType).getPointerSize() * 8;
+  PointerBitWidth = clift::unwrapped_cast<PointerType>(PointerToReplaceType)
+                      .getPointerSize()
+                    * 8;
 
   std::vector<PointerArithmetic>
     ExplicitArithmetics = toExplicitArrayAccesses(Arithmetic);
 
-  mlir::Type PointeeType = getPointerType(PointerToReplaceType)
-                             .getPointeeType();
+  mlir::Type
+    PointeeType = clift::unwrapped_cast<PointerType>(PointerToReplaceType)
+                    .getPointeeType();
 
   // Obtain the `BestTraversal` for connecting `BaseType` to `PointeeType`,
   // following one of the possible `ExplicitArithmetic`s
@@ -821,8 +824,8 @@ BestTraversalChooser::toExplicitArrayAccesses(const PointerArithmetic
                                                 &Arithmetic) {
   std::vector<PointerArithmetic> Result;
 
-  auto BasePtrType = getPointerType(Arithmetic.BasePointer.getType());
-  revng_assert(BasePtrType);
+  auto BasePtrType = clift::unwrapped_cast<PointerType>(Arithmetic.BasePointer
+                                                          .getType());
   auto BaseType = BasePtrType.getPointeeType();
 
   // We retrieve all the `ArrayPath`s that we can build from `BaseType`

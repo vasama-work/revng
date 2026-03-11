@@ -21,13 +21,10 @@ namespace {
 template<typename CliftType>
 static std::pair<CliftType, bool>
 getAccessedTypeInfo(mlir::Value CurrentValue) {
-  if (isPointerType(CurrentValue.getType())) {
-    auto PtrType = getPointerType(CurrentValue.getType());
-    return { mlir::cast<CliftType>(collapseTypedefs(PtrType.getPointeeType())),
-             true };
+  if (auto P = clift::unwrapped_dyn_cast<PointerType>(CurrentValue.getType())) {
+    return { clift::unwrapped_cast<CliftType>(P.getPointeeType()), true };
   }
-  return { mlir::cast<CliftType>(collapseTypedefs(CurrentValue.getType())),
-           false };
+  return { clift::unwrapped_cast<CliftType>(CurrentValue.getType()), false };
 }
 
 // =============================================================================
@@ -88,7 +85,8 @@ Replacement Replacement::make(unsigned PointerBitWidth,
                               const PointerArithmetic &Arithmetic,
                               const Traversal &BestTraversal) {
 
-  auto BasePtrType = getPointerType(Arithmetic.BasePointer.getType());
+  auto BasePtrType = clift::unwrapped_cast<PointerType>(Arithmetic.BasePointer
+                                                          .getType());
   auto BaseType = BasePtrType.getPointeeType();
 
   // Start with an empty `Replacement` object, which will be populated in this
@@ -216,7 +214,9 @@ void Replacement::replace(ExpressionOpInterface PointerToReplace,
   // access the `struct` fields and `array` members, and to generate the
   // `AddressOp` at the end of the field access substitution. We extract it
   // from the `PointerToReplace` we are processing.
-  auto PointerSize = getPointerType(PointerToReplace->getResult(0).getType())
+  auto PointerSize = clift::unwrapped_cast<PointerType>(PointerToReplace
+                                                          ->getResult(0)
+                                                          .getType())
                        .getPointerSize();
 
   // Set insertion point right before the `PointerToReplace`
@@ -424,8 +424,9 @@ void replaceFieldAccess(ExpressionOpInterface PointerToReplace,
                         const Traversal &BestTraversal) {
 
   // Derive the `PointerBitWidth` from the `PointerToReplace` type
-  unsigned PointerBitWidth = getPointerType(PointerToReplace->getResult(0)
-                                              .getType())
+  unsigned PointerBitWidth = clift::unwrapped_cast<PointerType>(PointerToReplace
+                                                                  ->getResult(0)
+                                                                  .getType())
                                .getPointerSize()
                              * 8;
 
