@@ -178,9 +178,8 @@ static uint64_t commonPrefixStrides(const llvm::ArrayRef<ArrayShape> &LHS,
 static uint64_t typeDistance(mlir::Type Explicit, mlir::Type Ideal) {
 
   // Unwrap any typedefs to compare the underlying types
-  Explicit = dealias(mlir::cast<ValueType>(Explicit),
-                     /*IgnoreQualifiers=*/true);
-  Ideal = dealias(mlir::cast<ValueType>(Ideal), /*IgnoreQualifiers=*/true);
+  Explicit = unwrapTypedefs(mlir::cast<ValueType>(Explicit));
+  Ideal = unwrapTypedefs(mlir::cast<ValueType>(Ideal));
 
   return Explicit == Ideal ? 0 : std::numeric_limits<uint64_t>::max();
 }

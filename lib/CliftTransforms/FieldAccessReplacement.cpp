@@ -23,9 +23,11 @@ static std::pair<CliftType, bool>
 getAccessedTypeInfo(mlir::Value CurrentValue) {
   if (isPointerType(CurrentValue.getType())) {
     auto PtrType = getPointerType(CurrentValue.getType());
-    return { mlir::cast<CliftType>(dealias(PtrType.getPointeeType())), true };
+    return { mlir::cast<CliftType>(collapseTypedefs(PtrType.getPointeeType())),
+             true };
   }
-  return { mlir::cast<CliftType>(dealias(CurrentValue.getType())), false };
+  return { mlir::cast<CliftType>(collapseTypedefs(CurrentValue.getType())),
+           false };
 }
 
 // =============================================================================
