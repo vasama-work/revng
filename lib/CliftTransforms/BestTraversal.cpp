@@ -17,11 +17,6 @@ using namespace clift;
 
 static Logger Log("best-traversal");
 
-/// Helper function used to retrieve the byte size of any `mlir::Type`
-static uint64_t getTypeSize(mlir::Type Type) {
-  return mlir::cast<clift::ValueType>(Type).getByteSize();
-}
-
 /// Helper function which converts a generic `ArrayPath` to a compatible form
 /// used to store the `array` traversal into the `Traversal` class. The
 /// re-ordering in descending `Stride` order is provided by the comparison
@@ -69,7 +64,7 @@ int64_t Traversal::begin() const {
 }
 
 int64_t Traversal::end() const {
-  return begin() + getTypeSize(TargetType);
+  return begin() + getObjectSizeOrZero(TargetType);
 }
 
 void Traversal::dump() const {
@@ -463,7 +458,9 @@ TypeTraversalAnalyzer::traverse(mlir::Type BaseType) {
               if (A.StartOffset != B.StartOffset) {
                 return A.StartOffset < B.StartOffset;
               } else {
-                return getTypeSize(A.TargetType) < getTypeSize(B.TargetType);
+                auto ASize = getObjectSizeOrZero(A.TargetType);
+                auto BSize = getObjectSizeOrZero(B.TargetType);
+                return ASize < BSize;
               }
             });
 
@@ -489,7 +486,7 @@ TypeTraversalAnalyzer::traverseImpl(mlir::Type Type,
 
   // We should never reach a type with zero size - if we do, it means there is
   // something severely wrong in the types we're working with
-  revng_assert(getTypeSize(Type) > 0);
+  revng_assert(getObjectSizeOrZero(Type) > 0);
 
   if (auto PrimitiveType = mlir::dyn_cast<clift::PrimitiveType>(Type)) {
     // `PrimitiveType` is a leaf node in our traversal
@@ -538,7 +535,7 @@ TypeTraversalAnalyzer::traverseImpl(mlir::Type Type,
                             CurrentArrayPath);
     clift::ValueType ElementType = ArrayType.getElementType();
     uint64_t NumElements = ArrayType.getElementsCount();
-    uint64_t ElementSize = ElementType.getByteSize();
+    uint64_t ElementSize = getObjectSize(ElementType);
 
     // Add this array to the current array path
     NestedArrayShape ArrayInfo;
@@ -690,7 +687,7 @@ BestTraversalChooser::computeBestTraversal(ExpressionOpInterface
   auto BasePtrType = getPointerType(Arithmetic.BasePointer.getType());
   revng_assert(BasePtrType);
   auto BaseType = BasePtrType.getPointeeType();
-  if (BaseType.getByteSize() == 0) {
+  if (getObjectSizeOrZero(BaseType) == 0) {
     return std::nullopt;
   }
 
