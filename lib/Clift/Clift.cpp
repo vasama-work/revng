@@ -1238,26 +1238,22 @@ mlir::LogicalResult PtrSubOp::verify() {
 //===------------------------------ PtrDiffOp -----------------------------===//
 
 mlir::LogicalResult PtrDiffOp::verify() {
-  auto LhsPT = clift::unwrapped_dyn_cast<PointerType>(getLhs().getType());
-  auto RhsPT = clift::unwrapped_dyn_cast<PointerType>(getRhs().getType());
+  auto LHS = clift::unwrapped_cast<PointerType>(getLhs().getType());
+  auto RHS = clift::unwrapped_cast<PointerType>(getRhs().getType());
 
-  if (not LhsPT or not RhsPT)
+  if (not clift::equivalent(clift::unwrapTypedefs(LHS.getPointeeType()),
+                            clift::unwrapTypedefs(RHS.getPointeeType())))
     return emitOpError() << getOperationName()
-                         << " requires two pointer operands.";
+                         << " operand pointee types must be equal (ignoring"
+                            " cv-qualifiers).";
 
-  auto PointeeType = LhsPT.getPointeeType();
-  if (not equivalent(PointeeType, RhsPT.getPointeeType()))
-    return emitOpError() << getOperationName()
-                         << " operand pointee types must match, ignoring"
-                            " qualifiers.";
-
-  if (not clift::unwrapped_isa<ObjectType>(PointeeType))
+  if (not clift::unwrapped_isa<ObjectType>(LHS.getPointeeType()))
     return emitOpError() << getOperationName()
                          << " operand pointee must have object type.";
 
   auto IntType = mlir::dyn_cast<IntegerType>(getResult().getType());
   if (not IntType or not IntType.isSigned()
-      or IntType.getSize() != LhsPT.getPointerSize())
+      or IntType.getSize() != LHS.getPointerSize())
     return emitOpError() << getOperationName()
                          << " result must have primitive signed integer type"
                             " with size matching that of the operand type.";

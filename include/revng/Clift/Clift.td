@@ -896,10 +896,10 @@ def Clift_RemOp : Clift_BinaryArithmeticOp<"rem">;
 def Clift_PtrAddOp : Clift_PointerArithmeticOp<"ptr_add", [Commutative]>;
 def Clift_PtrSubOp : Clift_PointerArithmeticOp<"ptr_sub">;
 
-def Clift_PtrDiffOp
-  : Clift_ExpressionOp<"ptr_diff", [Clift_AllTypesMatch<["lhs", "rhs"]>]> {
+def Clift_PtrDiffOp : Clift_ExpressionOp<"ptr_diff"> {
+  let arguments = (ins Clift_AnyPointerType:$lhs,
+                       Clift_AnyPointerType:$rhs);
 
-  let arguments = (ins AnyType:$lhs, AnyType:$rhs);
   let results = (outs Clift_AnyNonConstType<AnyType>:$result);
 
   let assemblyFormat = [{
