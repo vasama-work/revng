@@ -9,12 +9,14 @@
 #include "stddef.h"
 #include "stdint.h"
 
-#if __STDC_VERSION__ >= 201112L
+#if __STDC_VERSION__ >= 202311L
+#define revng_static_assert static_assert
+#elif __STDC_VERSION__ >= 201112L
 #define revng_static_assert(condition, ...) \
   _Static_assert(condition, __VA_ARGS__ "")
 #else
 #define revng_static_assert(condition, ...) \
-  typedef char static_assert_typedef[(condition) ? 1 : 0]
+  typedef char static_assert_typedef[(condition) ? 1 : -1]
 #endif
 
 revng_static_assert(CHAR_MIN == SCHAR_MIN, "CHAR_MIN != SCHAR_MIN");
@@ -241,3 +243,5 @@ extern uintmax_t undef_value(void);
 #else
 #define bit_cast(T, ...) __builtin_bit_cast(T, (__VA_ARGS__))
 #endif
+
+#undef revng_static_assert
