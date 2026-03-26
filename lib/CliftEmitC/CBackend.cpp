@@ -119,7 +119,7 @@ public:
     if (E.getValue() != 0)
       return false;
 
-    if (auto Cast = mlir::dyn_cast<BitCastOp>(getOnlyUser(E)))
+    if (auto Cast = getOnlyUser<BitCastOp>(E))
       return clift::unwrapped_isa<PointerType>(Cast.getResult().getType());
 
     return false;
