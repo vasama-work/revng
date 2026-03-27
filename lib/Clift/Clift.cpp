@@ -1289,9 +1289,8 @@ mlir::LogicalResult PtrDiffOp::verify() {
 
 mlir::LogicalResult DecayOp::verify() {
   auto ArgT = collapseTypedefs(getValue().getType());
-  auto ResT = unwrapTypedefs(getResult().getType());
 
-  auto PtrT = mlir::dyn_cast<PointerType>(ResT);
+  auto PtrT = clift::unwrapped_dyn_cast<PointerType>(getResult().getType());
   if (not PtrT)
     return emitOpError() << getOperationName()
                          << " result must have pointer type.";
