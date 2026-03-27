@@ -17,7 +17,7 @@ namespace mlir::clift {
 /// Convert the specified unqualified model type to a Clift type in the
 /// specified context.
 ///
-/// \return The corresponding Clift ValueType, or null on failure.
+/// \return The corresponding Clift type, or null on failure.
 mlir::Type importType(llvm::function_ref<mlir::InFlightDiagnostic()> EmitError,
                       mlir::MLIRContext &Context,
                       const model::TypeDefinition &ModelType,
@@ -26,7 +26,7 @@ mlir::Type importType(llvm::function_ref<mlir::InFlightDiagnostic()> EmitError,
 /// Convert the specified qualified model type to a Clift type in the specified
 /// context.
 ///
-/// \return The corresponding Clift ValueType, or null on failure.
+/// \return The corresponding Clift type, or null on failure.
 mlir::Type importType(llvm::function_ref<mlir::InFlightDiagnostic()> EmitError,
                       mlir::MLIRContext &Context,
                       const model::Type &ModelType,

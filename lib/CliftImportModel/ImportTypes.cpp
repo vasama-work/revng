@@ -704,7 +704,7 @@ clift::importSegmentDeclaration(mlir::ModuleOp Module,
                                 mlir::Location DebugLocation,
                                 llvm::StringRef Name,
                                 llvm::StringRef Handle,
-                                clift::ValueType Type) {
+                                mlir::Type Type) {
   mlir::OpBuilder Builder(Module.getContext());
   mlir::OpBuilder::InsertionGuard Guard(Builder);
   Builder.setInsertionPointToEnd(Module.getBody());

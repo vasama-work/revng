@@ -371,7 +371,7 @@ void CEmitter::emitCAttribute(CAttributeAttr CAttribute) {
         Tokens.emitIntegerLiteral(Integer.getValue(), std::nullopt);
 
       } else if (auto Type = mlir::dyn_cast<mlir::TypeAttr>(A)) {
-        auto VT = mlir::dyn_cast<mlir::clift::ValueType>(Type.getValue());
+        auto VT = mlir::dyn_cast<mlir::Type>(Type.getValue());
         revng_assert(VT);
         emitType(VT);
 

@@ -297,7 +297,7 @@ public:
   }
 
   static bool requiresExplicitBitCast(BitCastOp Op) {
-    auto IsCastableType = [](ValueType T) {
+    auto IsCastableType = [](mlir::Type T) {
       T = unwrapTypedefs(T);
 
       return mlir::isa<IntegerType, EnumType, PointerType>(T);
