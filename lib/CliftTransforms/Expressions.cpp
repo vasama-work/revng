@@ -47,27 +47,6 @@ static bool assignTypePunnedConstraint(mlir::Value Ptr, mlir::Value Value) {
          and getObjectSize(SrcType) == getObjectSizeOrZero(DstType);
 }
 
-static mlir::Value assignTypePunnedResult(mlir::PatternRewriter &Rewriter,
-                                          mlir::Value OldAssignment,
-                                          mlir::Value NewAssignment,
-                                          mlir::Value PointerCast,
-                                          mlir::Value Indirection) {
-  mlir::Value Result = NewAssignment;
-  if (not isDiscarded(OldAssignment)) {
-    mlir::Location PointerCastLoc = PointerCast.getDefiningOp()->getLoc();
-    mlir::Location IndirectionLoc = Indirection.getDefiningOp()->getLoc();
-
-    auto NewPtrType = mlir::cast<PointerType>(PointerCast.getType());
-    auto OldPtrType = PointerType::get(NewAssignment.getType(),
-                                       NewPtrType.getPointerSize());
-
-    Result = Rewriter.create<AddressofOp>(IndirectionLoc, OldPtrType, Result);
-    Result = Rewriter.create<BitCastOp>(PointerCastLoc, NewPtrType, Result);
-    Result = Rewriter.create<IndirectionOp>(IndirectionLoc, Result);
-  }
-  return Result;
-}
-
 static bool hasEnumeratorValue(mlir::Type Type, uint64_t Value) {
   if (auto Enum = mlir::dyn_cast<EnumType>(Type)) {
     for (EnumFieldAttr Enumerator : Enum.getFields()) {

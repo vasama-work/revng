@@ -23,7 +23,8 @@ module attributes {clift.module} {
     clift.expr {
       %0 = clift.undef : !ptr32_s
       %1 = clift.access<indirect 0> %0 : !ptr32_s -> !int32_t
-      clift.yield %1 : !int32_t
+      %2 = clift.discard %1 : !int32_t
+      clift.yield %2 : !void
     }
   }
 }

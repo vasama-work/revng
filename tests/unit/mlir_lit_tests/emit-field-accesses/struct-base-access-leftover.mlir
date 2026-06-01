@@ -38,7 +38,8 @@ module attributes {clift.module} {
       %4 = clift.imm 6 : !generic64_t
       %5 = clift.add %3, %4 : !generic64_t
       %6 = clift.bitcast %5 : !generic64_t -> !clift.ptr<8 to !int8_t>
-      clift.yield %6 : !int8_t$ptr
+      %7 = clift.discard %6 : !int8_t$ptr
+      clift.yield %7 : !void
     }
   }
 
@@ -52,7 +53,8 @@ module attributes {clift.module} {
   // CHECK: [[ADD:%[0-9]+]] = clift.add [[CAST1]], [[IMM]]
   // CHECK: [[CAST2:%[0-9]+]] = clift.bitcast [[ADD]]
   // CHECK: [[CAST3:%[0-9]+]] = clift.bitcast [[CAST2]]
-  // CHECK: clift.yield [[CAST3]] : !clift.ptr<8 to !int8_t>
+  // CHECK: [[DISCARD:%[0-9]+]] = clift.discard [[CAST3]] : !clift.ptr<8 to !int8_t>
+  // CHECK: clift.yield [[DISCARD]] : !void
 
   // Struct access going over the boundaries of the struct, not converted into an access
 
@@ -65,7 +67,8 @@ module attributes {clift.module} {
       %4 = clift.imm 8 : !generic64_t
       %5 = clift.add %3, %4 : !generic64_t
       %6 = clift.bitcast %5 : !generic64_t -> !clift.ptr<8 to !int8_t>
-      clift.yield %6 : !int8_t$ptr
+      %7 = clift.discard %6 : !int8_t$ptr
+      clift.yield %7 : !void
     }
   }
 
@@ -77,6 +80,7 @@ module attributes {clift.module} {
   // CHECK: [[IMM:%[0-9]+]] = clift.imm 8
   // CHECK: [[ADD:%[0-9]+]] = clift.add [[CAST2]], [[IMM]]
   // CHECK: [[CAST3:%[0-9]+]] = clift.bitcast [[ADD]]
-  // CHECK: clift.yield [[CAST3]] : !clift.ptr<8 to !int8_t>
+  // CHECK: [[DISCARD:%[0-9]+]] = clift.discard [[CAST3]] : !clift.ptr<8 to !int8_t>
+  // CHECK: clift.yield [[DISCARD]] : !void
   // CHECK-NOT: [[ACCESS:%[0-9]+]] = clift.access<indirect 1> [[ADDRESSOF]]
 }

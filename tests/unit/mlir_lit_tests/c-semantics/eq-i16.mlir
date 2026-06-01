@@ -19,7 +19,8 @@ module attributes {clift.module} {
       %0 = clift.imm 0 : !int32_t
       %1 = clift.imm 0 : !int32_t
       %2 = clift.eq %0, %1 : !int32_t -> !int16_t
-      clift.yield %2 : !int16_t
+      %3 = clift.discard %2 : !int16_t
+      clift.yield %3 : !void
     }
   }
 }

@@ -34,52 +34,60 @@ module attributes {clift.module} {
     // CHECK: 0;
     clift.expr {
       %i = clift.imm 0 : !int32_t
-      clift.yield %i : !int32_t
+      %d = clift.discard %i : !int32_t
+      clift.yield %d : !void
     }
 
     // CHECK: 0U;
     clift.expr {
       %u = clift.imm 0 : !uint32_t
-      clift.yield %u : !uint32_t
+      %d = clift.discard %u : !uint32_t
+      clift.yield %d : !void
     }
 
     // CHECK: 0L;
     clift.expr {
       %0 = clift.imm 0 : !int64_t
-      clift.yield %0 : !int64_t
+      %1 = clift.discard %0 : !int64_t
+      clift.yield %1 : !void
     }
 
     // CHECK: 0UL;
     clift.expr {
       %0 = clift.imm 0 : !uint64_t
-      clift.yield %0 : !uint64_t
+      %1 = clift.discard %0 : !uint64_t
+      clift.yield %1 : !void
     }
 
     // CHECK: (int128_t) 0;
     clift.expr {
       %0 = clift.imm 0 : !int64_t
       %1 = clift.extend %0 : !int64_t -> !int128_t
-      clift.yield %1 : !int128_t
+      %2 = clift.discard %1 : !int128_t
+      clift.yield %2 : !void
     }
 
     // CHECK: (uint128_t) 0U;
     clift.expr {
       %0 = clift.imm 0 : !uint64_t
       %1 = clift.extend %0 : !uint64_t -> !uint128_t
-      clift.yield %1 : !uint128_t
+      %2 = clift.discard %1 : !uint128_t
+      clift.yield %2 : !void
     }
 
     // CHECK: my_enum_0;
     clift.expr {
       %e = clift.imm 0 : !my_enum
-      clift.yield %e : !my_enum
+      %d = clift.discard %e : !my_enum
+      clift.yield %d : !void
     }
 
     // CHECK: (my_enum) 1;
     clift.expr {
       %0 = clift.imm 1 : !int64_t
       %1 = clift.bitcast %0 : !int64_t -> !my_enum
-      clift.yield %1 : !my_enum
+      %2 = clift.discard %1 : !my_enum
+      clift.yield %2 : !void
     }
   }
   // CHECK: }

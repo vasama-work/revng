@@ -47,7 +47,8 @@ module attributes {clift.module} {
       // Add to array base: `&struct + index * 4`
       %12 = clift.add %3, %11 : !generic64_t
       %13 = clift.bitcast %12 : !generic64_t -> !int32_t$ptr
-      clift.yield %13 : !int32_t$ptr
+      %14 = clift.discard %13 : !int32_t$ptr
+      clift.yield %14 : !void
     }
   }
 
@@ -68,5 +69,6 @@ module attributes {clift.module} {
   // CHECK: [[ARR_DECAY:%[0-9]+]] = clift.decay [[ARR_ACCESS]]
   // CHECK: [[SUBSCRIPT:%[0-9]+]] = clift.subscript [[ARR_DECAY]], [[IDX_EXT]]
   // CHECK: [[ADDRESSOF2:%[0-9]+]] = clift.addressof [[SUBSCRIPT]]
-  // CHECK: clift.yield [[ADDRESSOF2]] : !clift.ptr<8 to !int32_t>
+  // CHECK: [[DISCARD:%[0-9]+]] = clift.discard [[ADDRESSOF2]] : !clift.ptr<8 to !int32_t>
+  // CHECK: clift.yield [[DISCARD]] : !void
 }

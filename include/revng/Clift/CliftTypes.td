@@ -40,6 +40,8 @@ def Clift_VoidType
     }]>,
   ];
 
+  let builderCall = [{ $_builder.getType<VoidType>() }];
+
   let assemblyFormat = [{}];
 
   let genVerifyDecl = 1;

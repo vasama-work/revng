@@ -20,7 +20,8 @@ module attributes { clift.module } {
     // CHECK: 0;
     clift.expr {
       %0 = clift.imm 0 : !int32_t
-      clift.yield %0 : !int32_t
+      %1 = clift.discard %0 : !int32_t
+      clift.yield %1 : !void
     } attributes { clift.comments = ["hello", "world"] }
   // CHECK: }
   }

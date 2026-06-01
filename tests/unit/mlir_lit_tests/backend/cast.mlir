@@ -31,21 +31,24 @@ module attributes {clift.module} {
     clift.expr {
       %0 = clift.imm 0 : !int32_t
       %1 = clift.bitcast %0 : !int32_t -> !uint32_t
-      clift.yield %1 : !uint32_t
+      %2 = clift.discard %1 : !uint32_t
+      clift.yield %2 : !void
     }
 
     // CHECK: (uint32_t) &var_0;
     clift.expr {
       %0 = clift.addressof %x : !uint32_t$ptr
       %1 = clift.bitcast %0 : !uint32_t$ptr -> !uint32_t
-      clift.yield %1 : !uint32_t
+      %2 = clift.discard %1 : !uint32_t
+      clift.yield %2 : !void
     }
 
     // CHECK: bit_cast(float32_t, 0)
     clift.expr {
       %0 = clift.imm 0 : !int32_t
       %1 = clift.bitcast %0 : !int32_t -> !float32_t
-      clift.yield %1 : !float32_t
+      %2 = clift.discard %1 : !float32_t
+      clift.yield %2 : !void
     }
   }
   // CHECK: }

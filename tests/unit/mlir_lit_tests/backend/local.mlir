@@ -94,27 +94,32 @@ module attributes {clift.module} {
 
     // CHECK: var_0;
     clift.expr {
-        clift.yield %e : !my_enum
+        %d = clift.discard %e : !my_enum
+        clift.yield %d : !void
     }
 
     // CHECK: var_1;
     clift.expr {
-        clift.yield %s : !my_struct
+        %d = clift.discard %s : !my_struct
+        clift.yield %d : !void
     }
 
     // CHECK: var_2;
     clift.expr {
-        clift.yield %u : !my_union
+        %d = clift.discard %u : !my_union
+        clift.yield %d : !void
     }
 
     // CHECK: var_3;
     clift.expr {
-        clift.yield %i : !int32_t
+        %d = clift.discard %i : !int32_t
+        clift.yield %d : !void
     }
 
     // CHECK: var_4;
     clift.expr {
-        clift.yield %p : !my_pair
+        %d = clift.discard %p : !my_pair
+        clift.yield %d : !void
     }
   }
   // CHECK: }

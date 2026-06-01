@@ -22,7 +22,8 @@ module attributes {clift.module} {
       // CHECK: 1;
       clift.expr {
         %0 = clift.imm 1 : !int32_t
-        clift.yield %0 : !int32_t
+        %1 = clift.discard %0 : !int32_t
+        clift.yield %1 : !void
       }
     // CHECK: }
     }
@@ -39,7 +40,8 @@ module attributes {clift.module} {
           // CHECK: 3;
           clift.expr {
             %0 = clift.imm 3 : !int32_t
-            clift.yield %0 : !int32_t
+            %1 = clift.discard %0 : !int32_t
+            clift.yield %1 : !void
           }
         // CHECK: }
         }
@@ -49,7 +51,8 @@ module attributes {clift.module} {
       // CHECK: 4;
       clift.expr {
         %0 = clift.imm 4 : !int32_t
-        clift.yield %0 : !int32_t
+        %1 = clift.discard %0 : !int32_t
+        clift.yield %1 : !void
       }
     // CHECK: }
     }

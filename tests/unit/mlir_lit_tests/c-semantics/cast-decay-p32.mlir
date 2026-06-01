@@ -19,7 +19,8 @@ module attributes {clift.module} {
     // CHECK: Pointer operation is not representable in the target implementation
     clift.expr {
       %1 = clift.decay %0 : !array_int32_t -> !ptr32_int32_t
-      clift.yield %1 : !ptr32_int32_t
+      %2 = clift.discard %1 : !ptr32_int32_t
+      clift.yield %2 : !void
     }
   }
 }

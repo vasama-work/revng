@@ -66,7 +66,8 @@ module attributes {clift.module} {
       %4 = clift.imm 4 : !generic64_t
       %5 = clift.add %3, %4 : !generic64_t
       %6 = clift.bitcast %5 : !generic64_t -> !clift.ptr<8 to !int64_t>
-      clift.yield %6 : !int64_t$ptr
+      %7 = clift.discard %6 : !int64_t$ptr
+      clift.yield %7 : !void
     }
   }
 
@@ -76,7 +77,8 @@ module attributes {clift.module} {
   // CHECK: [[ACCESS1:%[0-9]+]] = clift.access<indirect 1> [[ADDRESSOF1]]
   // CHECK: [[ACCESS2:%[0-9]+]] = clift.access< 1> [[ACCESS1]]
   // CHECK: [[ADDRESSOF2:%[0-9]+]] = clift.addressof [[ACCESS2]]
-  // CHECK: clift.yield [[ADDRESSOF2]] : !clift.ptr<8 to !int64_t>
+  // CHECK: [[DISCARD:%[0-9]+]] = clift.discard [[ADDRESSOF2]] : !clift.ptr<8 to !int64_t>
+  // CHECK: clift.yield [[DISCARD]] : !void
 
   // Access to the `struct` field of the nested union, selected due to the type of
   // the access towards the nested struct field
@@ -90,7 +92,8 @@ module attributes {clift.module} {
       %4 = clift.imm 4 : !generic64_t
       %5 = clift.add %3, %4 : !generic64_t
       %6 = clift.bitcast %5 : !generic64_t -> !clift.ptr<8 to !int32_t>
-      clift.yield %6 : !int32_t$ptr
+      %7 = clift.discard %6 : !int32_t$ptr
+      clift.yield %7 : !void
     }
   }
 
@@ -101,7 +104,8 @@ module attributes {clift.module} {
   // CHECK: [[ACCESS2:%[0-9]+]] = clift.access< 0> [[ACCESS1]]
   // CHECK: [[ACCESS3:%[0-9]+]] = clift.access< 0> [[ACCESS2]]
   // CHECK: [[ADDRESSOF2:%[0-9]+]] = clift.addressof [[ACCESS3]]
-  // CHECK: clift.yield [[ADDRESSOF2]] : !clift.ptr<8 to !int32_t>
+  // CHECK: [[DISCARD:%[0-9]+]] = clift.discard [[ADDRESSOF2]] : !clift.ptr<8 to !int32_t>
+  // CHECK: clift.yield [[DISCARD]] : !void
 
   // Access to the `struct` field of the nested union, second field, selected due
   // to the offset into the nested `struct`
@@ -115,7 +119,8 @@ module attributes {clift.module} {
       %4 = clift.imm 8 : !generic64_t
       %5 = clift.add %3, %4 : !generic64_t
       %6 = clift.bitcast %5 : !generic64_t -> !clift.ptr<8 to !int32_t>
-      clift.yield %6 : !int32_t$ptr
+      %7 = clift.discard %6 : !int32_t$ptr
+      clift.yield %7 : !void
     }
   }
 
@@ -126,7 +131,8 @@ module attributes {clift.module} {
   // CHECK: [[ACCESS2:%[0-9]+]] = clift.access< 0> [[ACCESS1]]
   // CHECK: [[ACCESS3:%[0-9]+]] = clift.access< 1> [[ACCESS2]]
   // CHECK: [[ADDRESSOF2:%[0-9]+]] = clift.addressof [[ACCESS3]]
-  // CHECK: clift.yield [[ADDRESSOF2]] : !clift.ptr<8 to !int32_t>
+  // CHECK: [[DISCARD:%[0-9]+]] = clift.discard [[ADDRESSOF2]] : !clift.ptr<8 to !int32_t>
+  // CHECK: clift.yield [[DISCARD]] : !void
 
 
   // Access to the `int32_t` field of the nested union, selected due to the type
@@ -141,7 +147,8 @@ module attributes {clift.module} {
       %4 = clift.imm 4 : !generic64_t
       %5 = clift.add %3, %4 : !generic64_t
       %6 = clift.bitcast %5 : !generic64_t -> !clift.ptr<8 to !int32_t>
-      clift.yield %6 : !int32_t$ptr
+      %7 = clift.discard %6 : !int32_t$ptr
+      clift.yield %7 : !void
     }
   }
 
@@ -151,5 +158,6 @@ module attributes {clift.module} {
   // CHECK: [[ACCESS1:%[0-9]+]] = clift.access<indirect 1> [[ADDRESSOF1]]
   // CHECK: [[ACCESS2:%[0-9]+]] = clift.access< 1> [[ACCESS1]]
   // CHECK: [[ADDRESSOF2:%[0-9]+]] = clift.addressof [[ACCESS2]]
-  // CHECK: clift.yield [[ADDRESSOF2]] : !clift.ptr<8 to !int32_t>
+  // CHECK: [[DISCARD:%[0-9]+]] = clift.discard [[ADDRESSOF2]] : !clift.ptr<8 to !int32_t>
+  // CHECK: clift.yield [[DISCARD]] : !void
 }

@@ -29,16 +29,20 @@ module attributes {clift.module} {
     clift.expr {
       // CHECK: %0 = clift.imm 0 : !my_enum
       %0 = clift.imm 0 : !my_enum
-      // CHECK: clift.yield %0 : !my_enum
-      clift.yield %0 : !my_enum
+      // CHECK: %1 = clift.discard %0 : !my_enum
+      %1 = clift.discard %0 : !my_enum
+      // CHECK: clift.yield %1 : !void
+      clift.yield %1 : !void
     }
 
     clift.expr {
       // CHECK: %0 = clift.imm 1 : !int32_t
       %0 = clift.imm 1 : !my_enum
       // CHECK: %1 = clift.bitcast %0 : !int32_t -> !my_enum
-      // CHECK: clift.yield %1 : !my_enum
-      clift.yield %0 : !my_enum
+      // CHECK: %2 = clift.discard %1 : !my_enum
+      %1 = clift.discard %0 : !my_enum
+      // CHECK: clift.yield %2 : !void
+      clift.yield %1 : !void
     }
   }
 }

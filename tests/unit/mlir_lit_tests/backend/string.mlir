@@ -20,13 +20,15 @@ module attributes {clift.module} {
     // CHECK: "hello \"world\" \\ \0\7\x08\t\n\v\f\r\x7f\xff";
     clift.expr {
       %s = clift.str "hello \"world\" \\ \00\07\08\09\0a\0b\0c\0d\7f\ff" : !clift.array<27 x !char$const>
-      clift.yield %s : !clift.array<27 x !char$const>
+      %d = clift.discard %s : !clift.array<27 x !char$const>
+      clift.yield %d : !void
     }
 
     // CHECK: "\0 \0000 \0f \xff \3770 \377f"
     clift.expr {
       %s = clift.str "\00 \000 \00f \ff \ff0 \fff" : !clift.array<16 x !char$const>
-      clift.yield %s : !clift.array<16 x !char$const>
+      %d = clift.discard %s : !clift.array<16 x !char$const>
+      clift.yield %d : !void
     }
   }
   // CHECK: }

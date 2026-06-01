@@ -439,10 +439,6 @@ def Clift_ExpressionStatementOp
   }];
 
   let extraClassDeclaration = [{
-    [[nodiscard]] bool isDiscardedExpression(mlir::Region &R) {
-      return true;
-    }
-
     unsigned getExpressionRegionCount() {
       return 1;
     }
@@ -452,6 +448,8 @@ def Clift_ExpressionStatementOp
       return getExpression();
     }
   }];
+
+  let hasVerifier = 1;
 }
 
 def Clift_ForOp
@@ -468,8 +466,6 @@ def Clift_ForOp
   let hasVerifier = 1;
 
   let extraClassDeclaration = [{
-    [[nodiscard]] bool isDiscardedExpression(mlir::Region &R);
-
     [[nodiscard]] bool isBooleanTestedExpression(mlir::Region &R) {
       return &R == &getCondition();
     }
@@ -745,6 +741,16 @@ def Clift_YieldOp : Clift_Op<"yield", [Clift_ExpressionOpInterface,
   let extraClassDeclaration = [{
     [[nodiscard]] bool isDiscardedOperand(mlir::OpOperand &Operand);
     [[nodiscard]] bool isBooleanTestedOperand(mlir::OpOperand &Operand);
+  }];
+}
+
+def Clift_DiscardOp : Clift_ExpressionOp<"discard"> {
+  let arguments = (ins Clift_AnyAddressableType:$value);
+
+  let results = (outs Clift_VoidType:$result);
+
+  let assemblyFormat = [{
+    $value attr-dict `:` type($value)
   }];
 }
 
@@ -1140,7 +1146,7 @@ def Clift_SubscriptOp
 def Clift_CommaOp : Clift_ExpressionOp<"comma",
                                        [AllTypesMatch<["rhs", "result"]>]> {
 
-  let arguments = (ins Clift_AnyAddressableType:$lhs,
+  let arguments = (ins Clift_VoidType:$lhs,
                        Clift_AnyAddressableType:$rhs);
 
   let results = (outs AnyType:$result);

@@ -25,7 +25,8 @@ module attributes {clift.module} {
       // CHECK: 1;
       clift.expr {
         %0 = clift.imm 1 : !int32_t
-        clift.yield %0 : !int32_t
+        %1 = clift.discard %0 : !int32_t
+        clift.yield %1 : !void
       }
     // CHECK: else if (2)
     } else {
@@ -36,14 +37,16 @@ module attributes {clift.module} {
         // CHECK: 3;
         clift.expr {
           %0 = clift.imm 3 : !int32_t
-          clift.yield %0 : !int32_t
+          %1 = clift.discard %0 : !int32_t
+          clift.yield %1 : !void
         }
       // CHECK: else
       } else {
         // CHECK: 4;
         clift.expr {
           %0 = clift.imm 4 : !int32_t
-          clift.yield %0 : !int32_t
+          %1 = clift.discard %0 : !int32_t
+          clift.yield %1 : !void
         }
       }
     }
@@ -56,39 +59,46 @@ module attributes {clift.module} {
       // CHECK: 6;
       clift.expr {
         %0 = clift.imm 6 : !int32_t
-        clift.yield %0 : !int32_t
+        %1 = clift.discard %0 : !int32_t
+        clift.yield %1 : !void
       }
       // CHECK: 7;
       clift.expr {
         %0 = clift.imm 7 : !int32_t
-        clift.yield %0 : !int32_t
+        %1 = clift.discard %0 : !int32_t
+        clift.yield %1 : !void
       }
     // CHECK: } else if (8) {
     } else {
       clift.if {
         %0 = clift.imm 8 : !int32_t
-        clift.yield %0 : !int32_t
+        %1 = clift.discard %0 : !int32_t
+        clift.yield %1 : !void
       } then {
         // CHECK: 9;
         clift.expr {
           %0 = clift.imm 9 : !int32_t
-          clift.yield %0 : !int32_t
+          %1 = clift.discard %0 : !int32_t
+          clift.yield %1 : !void
         }
         // CHECK: 10;
         clift.expr {
           %0 = clift.imm 10 : !int32_t
-          clift.yield %0 : !int32_t
+          %1 = clift.discard %0 : !int32_t
+          clift.yield %1 : !void
         }
       } else {
         // CHECK: 11;
         clift.expr {
           %0 = clift.imm 11 : !int32_t
-          clift.yield %0 : !int32_t
+          %1 = clift.discard %0 : !int32_t
+          clift.yield %1 : !void
         }
         // CHECK: 12;
         clift.expr {
           %0 = clift.imm 12 : !int32_t
-          clift.yield %0 : !int32_t
+          %1 = clift.discard %0 : !int32_t
+          clift.yield %1 : !void
         }
       }
     }
@@ -107,7 +117,8 @@ module attributes {clift.module} {
         // CHECK: 15;
         clift.expr {
           %0 = clift.imm 15 : !int32_t
-          clift.yield %0 : !int32_t
+          %1 = clift.discard %0 : !int32_t
+          clift.yield %1 : !void
         }
       }
     // CHECK: } else
@@ -115,7 +126,8 @@ module attributes {clift.module} {
       // CHECK: 16;
       clift.expr {
         %0 = clift.imm 16 : !int32_t
-        clift.yield %0 : !int32_t
+        %1 = clift.discard %0 : !int32_t
+        clift.yield %1 : !void
       }
     }
   }

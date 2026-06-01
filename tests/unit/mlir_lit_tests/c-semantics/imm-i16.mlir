@@ -16,7 +16,8 @@ module attributes {clift.module} {
     // CHECK: is not representable in the target implementation
     clift.expr {
       %0 = clift.imm 0 : !int16_t
-      clift.yield %0 : !int16_t
+      %1 = clift.discard %0 : !int16_t
+      clift.yield %1 : !void
     }
   }
 }

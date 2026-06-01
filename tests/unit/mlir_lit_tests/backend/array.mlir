@@ -33,7 +33,8 @@ module attributes {clift.module} {
       %p = clift.decay %array : !int32_t$1 -> !int32_t$p
       %i = clift.imm 0 : !int32_t
       %r = clift.subscript %p, %i : (!int32_t$p, !int32_t)
-      clift.yield %r : !int32_t
+      %d = clift.discard %r : !int32_t
+      clift.yield %d : !void
     }
 
     // CHECK: int32_t(*var_1)[1]
@@ -52,7 +53,8 @@ module attributes {clift.module} {
       %i = clift.imm 0 : !int32_t
       %comma = clift.comma %i, %i : !int32_t, !int32_t
       %r = clift.subscript %p, %comma : (!int32_t$p, !int32_t)
-      clift.yield %r : !int32_t
+      %d = clift.discard %r : !int32_t
+      clift.yield %d : !void
     }
   }
   // CHECK: }

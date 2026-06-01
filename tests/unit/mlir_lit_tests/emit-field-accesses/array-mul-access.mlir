@@ -50,7 +50,8 @@ module attributes {clift.module} {
       %6 = clift.mul %4, %5 : !generic64_t
       %7 = clift.add %3, %6 : !generic64_t
       %8 = clift.bitcast %7 : !generic64_t -> !clift.ptr<8 to !int32_t>
-      clift.yield %8 : !int32_t$ptr
+      %9 = clift.discard %8 : !int32_t$ptr
+      clift.void %9 : !void
     }
   }
 
@@ -62,7 +63,8 @@ module attributes {clift.module} {
   // CHECK: [[IMM:%[0-9]+]] = clift.imm 2
   // CHECK: [[SUBSCRIPT:%[0-9]+]] = clift.subscript [[CAST1]], [[IMM]]
   // CHECK: [[ADDRESSOF2:%[0-9]+]] = clift.addressof [[SUBSCRIPT]]
-  // CHECK: clift.yield [[ADDRESSOF2]] : !clift.ptr<8 to !int32_t>
+  // CHECK: [[DISCARD:%[0-9]+]] = clift.discard [[ADDRESSOF2]] : !clift.ptr<8 to !int32_t>
+  // CHECK: clift.yield [[DISCARD]] : !void
 
 
   // `array` access to the first nested `struct` field
@@ -78,7 +80,8 @@ module attributes {clift.module} {
       %6 = clift.mul %4, %5 : !generic64_t
       %7 = clift.add %3, %6 : !generic64_t
       %8 = clift.bitcast %7 : !generic64_t -> !clift.ptr<8 to !int32_t>
-      clift.yield %8 : !int32_t$ptr
+      %9 = clift.discard %8 : !int32_t$ptr
+      clift.void %9 : !void
     }
   }
 
@@ -90,7 +93,8 @@ module attributes {clift.module} {
   // CHECK: [[IMM:%[0-9]+]] = clift.imm 1
   // CHECK: [[SUBSCRIPT:%[0-9]+]] = clift.subscript [[CAST1]], [[IMM]]
   // CHECK: [[ADDRESSOF2:%[0-9]+]] = clift.addressof [[SUBSCRIPT]]
-  // CHECK: clift.yield [[ADDRESSOF2]] : !clift.ptr<8 to !int32_t>
+  // CHECK: [[DISCARD:%[0-9]+]] = clift.discard [[ADDRESSOF2]] : !clift.ptr<8 to !int32_t>
+  // CHECK: clift.yield [[DISCARD]] : !void
 
 
   // Access to the second `struct` field nested inside an `array`
@@ -108,7 +112,8 @@ module attributes {clift.module} {
       %8 = clift.imm 4 : !generic64_t
       %9 = clift.add %7, %8 : !generic64_t
       %10 = clift.bitcast %9 : !generic64_t -> !clift.ptr<8 to !int32_t>
-      clift.yield %10 : !int32_t$ptr
+      %11 = clift.discard %10 : !int32_t$ptr
+      clift.yield %11 : !void
     }
   }
 
@@ -121,5 +126,6 @@ module attributes {clift.module} {
   // CHECK: [[SUBSCRIPT:%[0-9]+]] = clift.subscript [[CAST1]], [[IMM]]
   // CHECK: [[ACCESS:%[0-9]+]] = clift.access< 1> [[SUBSCRIPT]]
   // CHECK: [[ADDRESSOF2:%[0-9]+]] = clift.addressof [[ACCESS]]
-  // CHECK: clift.yield [[ADDRESSOF2]] : !clift.ptr<8 to !int32_t>
+  // CHECK: [[DISCARD:%[0-9]+]] = clift.discard [[ADDRESSOF2]] : !clift.ptr<8 to !int32_t>
+  // CHECK: clift.yield [[DISCARD]] : !void
 }

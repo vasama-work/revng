@@ -30,7 +30,8 @@ module attributes {clift.module} {
       %2 = clift.mul %arg1, %1 : !generic64_t
       %3 = clift.add %0, %2 : !generic64_t
       %4 = clift.bitcast %3 : !generic64_t -> !int32_t$ptr
-      clift.yield %4 : !int32_t$ptr
+      %5 = clift.discard %4 : !int32_t$ptr
+      clift.yield %5 : !void
     }
   }
 
@@ -38,7 +39,8 @@ module attributes {clift.module} {
   // CHECK: [[CAST:%[0-9]+]] = clift.bitcast [[POINTER]] : !_type_definition_100_TypedefDefinition -> !clift.ptr<8 to !int32_t>
   // CHECK: [[SUBSCRIPT:%[0-9]+]] = clift.subscript [[CAST]], [[INDEX]]
   // CHECK: [[ADDRESSOF:%[0-9]+]] = clift.addressof [[SUBSCRIPT]]
-  // CHECK: clift.yield [[ADDRESSOF]] : !clift.ptr<8 to !int32_t>
+  // CHECK: [[DISCARD:%[0-9]+]] = clift.discard [[ADDRESSOF]] : !clift.ptr<8 to !int32_t>
+  // CHECK: clift.yield [[DISCARD]] : !void
 
 
   // pointer as array access: *(p + 3) should become p[3], with a constant
@@ -49,7 +51,8 @@ module attributes {clift.module} {
       %1 = clift.imm 12 : !generic64_t
       %2 = clift.add %0, %1 : !generic64_t
       %3 = clift.bitcast %2 : !generic64_t -> !int32_t$ptr
-      clift.yield %3 : !int32_t$ptr
+      %4 = clift.discard %3 : !int32_t$ptr
+      clift.yield %4 : !void
     }
   }
 
@@ -58,5 +61,6 @@ module attributes {clift.module} {
   // CHECK: [[CAST:%[0-9]+]] = clift.bitcast [[POINTER]] : !_type_definition_100_TypedefDefinition -> !clift.ptr<8 to !int32_t>
   // CHECK: [[SUBSCRIPT:%[0-9]+]] = clift.subscript [[CAST]], [[IMM]]
   // CHECK: [[ADDRESSOF:%[0-9]+]] = clift.addressof [[SUBSCRIPT]]
-  // CHECK: clift.yield [[ADDRESSOF]] : !clift.ptr<8 to !int32_t>
+  // CHECK: [[DISCARD:%[0-9]+]] = clift.discard [[ADDRESSOF]] : !clift.ptr<8 to !int32_t>
+  // CHECK: clift.yield [[DISCARD]] : !void
 }

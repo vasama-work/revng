@@ -614,17 +614,20 @@ mlir::LogicalResult DoWhileOp::verify() {
   return mlir::success();
 }
 
+//===------------------------ ExpressionStatementOp ------------------------===//
+
+mlir::LogicalResult ExpressionStatementOp::verify() {
+  if (not clift::unwrapped_isa<VoidType>(getExpressionType(getExpression())))
+    return emitOpError() << getOperationName()
+                         << " expression must have void type.";
+
+  return mlir::success();
+}
+
 //===-------------------------------- ForOp -------------------------------===//
 
 mlir::Value ForOp::getBlockArgumentVariable(mlir::BlockArgument Argument) {
   return getOnlyOp<LocalVariableOp>(getInitializer());
-}
-
-bool ForOp::isDiscardedExpression(mlir::Region &R) {
-  if (&R == &getInitializer())
-    return not getOnlyOp<LocalVariableOp>(R);
-
-  return &R == &getExpression();
 }
 
 void ForOp::build(mlir::OpBuilder &Builder,
@@ -1061,27 +1064,18 @@ mlir::LogicalResult RequireOp::verify() {
 mlir::LogicalResult ReturnOp::verify() {
   mlir::Region &Expression = getResult();
 
-  mlir::Type ExprType = Expression.empty() ? mlir::Type() :
+  mlir::Type ExprType = Expression.empty() ? VoidType::get(getContext()) :
                                              getExpressionType(Expression);
 
-  if (ExprType and not clift::unwrapped_isa<VoidType, ValueType>(ExprType))
-    return emitOpError() << getOperationName()
-                         << " expression must have void or value type.";
-
   if (auto Function = getOperation()->getParentOfType<FunctionOp>()) {
-    mlir::Type ReturnType = Function.getReturnType();
-    mlir::Type UnqualifiedExprType = ExprType ? clift::removeConst(ExprType) :
-                                                mlir::Type();
-
-    if (clift::unwrapped_isa<VoidType>(ReturnType)) {
-      if (ExprType)
-        return emitOpError() << " cannot return expression in function "
-                                " returning void.";
-    } else if (UnqualifiedExprType != ReturnType) {
+    if (not clift::equivalentUnwrapped(ExprType, Function.getReturnType())) {
       return emitOpError() << getOperationName()
                            << " expression type must match the function return"
                               " type.";
     }
+  } else if (not clift::unwrapped_isa<VoidType, ValueType>(ExprType)) {
+    return emitOpError() << getOperationName()
+                         << " expression must have void or value type.";
   }
 
   return mlir::success();
@@ -1210,14 +1204,6 @@ mlir::LogicalResult WhileOp::verify() {
 //===----------------------------- Expressions ----------------------------===//
 
 //===------------------------------- YieldOp ------------------------------===//
-
-bool YieldOp::isDiscardedOperand(mlir::OpOperand &Operand) {
-  mlir::Region *R = getOperation()->getParentRegion();
-  revng_assert(R != nullptr);
-
-  auto Statement = mlir::cast<StatementOpInterface>(R->getParentOp());
-  return Statement.isDiscardedExpression(*R);
-}
 
 bool YieldOp::isBooleanTestedOperand(mlir::OpOperand &Operand) {
   mlir::Region *R = getOperation()->getParentRegion();

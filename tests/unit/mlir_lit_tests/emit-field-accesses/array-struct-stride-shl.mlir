@@ -51,7 +51,8 @@ module attributes {clift.module} {
       %7 = clift.add %5, %6 : !generic64_t
       %8 = clift.add %3, %7 : !generic64_t
       %9 = clift.bitcast %8 : !generic64_t -> !int64_t$ptr
-      clift.yield %9 : !int64_t$ptr
+      %10 = clift.discard %9 : !int64_t$ptr
+      clift.yield %10 : !void
     }
   }
 
@@ -63,7 +64,8 @@ module attributes {clift.module} {
   // CHECK: [[CAST:%[0-9]+]] = clift.decay [[ACCESS]]
   // CHECK: [[SUBSCRIPT:%[0-9]+]] = clift.subscript [[CAST]], [[ARG0]]
   // CHECK: [[ADDRESSOF2:%[0-9]+]] = clift.addressof [[SUBSCRIPT]]
-  // CHECK: clift.yield [[ADDRESSOF2]] : !clift.ptr<8 to !int64_t>
+  // CHECK: [[DISCARD:%[0-9]+]] = clift.discard [[ADDRESSOF2]] : !clift.ptr<8 to !int64_t>
+  // CHECK: clift.yield [[DISCARD]] : !void
 
   // Access pattern: `base + 8 + arg0 << `1 (stride=2 via shift-left by 1)
   // This exercises `composeShl` producing `Stride=2`, then `composeAdd` merging
@@ -80,7 +82,8 @@ module attributes {clift.module} {
       %7 = clift.add %5, %6 : !generic64_t
       %8 = clift.add %3, %7 : !generic64_t
       %9 = clift.bitcast %8 : !generic64_t -> !int16_t$ptr
-      clift.yield %9 : !int16_t$ptr
+      %10 = clift.discard %9 : !int16_t$ptr
+      clift.yield %10 : !void
     }
   }
 
@@ -92,5 +95,6 @@ module attributes {clift.module} {
   // CHECK: [[CAST:%[0-9]+]] = clift.decay [[ACCESS]]
   // CHECK: [[SUBSCRIPT:%[0-9]+]] = clift.subscript [[CAST]], [[ARG0]]
   // CHECK: [[ADDRESSOF2:%[0-9]+]] = clift.addressof [[SUBSCRIPT]]
-  // CHECK: clift.yield [[ADDRESSOF2]] : !clift.ptr<8 to !int16_t>
+  // CHECK: [[DISCARD:%[0-9]+]] = clift.discard [[ADDRESSOF2]] : !clift.ptr<8 to !int16_t>
+  // CHECK: clift.yield [[DISCARD]] : !void
 }

@@ -47,39 +47,45 @@ module attributes {clift.module} {
     // CHECK: var_0->x;
     clift.expr {
       %a = clift.access<indirect 0> %s : !s$p -> !int32_t
-      clift.yield %a : !int32_t
+      %d = clift.discard %a : !int32_t
+      clift.yield %d : !void
     }
 
     // CHECK: var_1->x;
     clift.expr {
       %a = clift.access<indirect 0> %u : !u$p -> !int32_t
-      clift.yield %a : !int32_t
+      %d = clift.discard %a : !int32_t
+      clift.yield %d : !void
     }
 
     // CHECK: var_0->y;
     clift.expr {
       %a = clift.access<indirect 1> %s : !s$p -> !int32_t
-      clift.yield %a : !int32_t
+      %d = clift.discard %a : !int32_t
+      clift.yield %d : !void
     }
 
     // CHECK: var_1->y;
     clift.expr {
       %a = clift.access<indirect 1> %u : !u$p -> !int32_t
-      clift.yield %a : !int32_t
+      %d = clift.discard %a : !int32_t
+      clift.yield %d : !void
     }
 
     // CHECK: (*var_0).x;
     clift.expr {
       %v = clift.indirection %s : !s$p
       %a = clift.access<0> %v : !s -> !int32_t
-      clift.yield %a : !int32_t
+      %d = clift.discard %a : !int32_t
+      clift.yield %d : !void
     }
 
     // CHECK: (*var_1).x;
     clift.expr {
       %v = clift.indirection %u : !u$p
       %a = clift.access<0> %v : !u -> !int32_t
-      clift.yield %a : !int32_t
+      %d = clift.discard %a : !int32_t
+      clift.yield %d : !void
     }
   }
   // CHECK: }

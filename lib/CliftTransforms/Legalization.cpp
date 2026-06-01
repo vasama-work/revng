@@ -70,7 +70,8 @@ static void modifyResultType(mlir::PatternRewriter &Rewriter,
   mlir::Type OldType = Result.getType();
   Result.setType(NewType);
 
-  if (PreserveExpressionType and not clift::isDiscarded(Result)) {
+  // WIP: Discarded expression
+  if (PreserveExpressionType) {
     Rewriter.setInsertionPointAfter(Op);
     OnlyUse.set(emitCast<ResizeCastOpOrVoid>(Rewriter,
                                              Op->getLoc(),

@@ -42,7 +42,8 @@ module attributes {clift.module} {
       %4 = clift.imm 4 : !generic64_t
       %5 = clift.add %3, %4 : !generic64_t
       %6 = clift.bitcast %5 : !generic64_t -> !clift.ptr<8 to !int32_t>
-      clift.yield %6 : !int32_t$ptr
+      %7 = clift.discard %6 : !int32_t$ptr
+      clift.yield %7 : !void
     }
   }
 
@@ -52,5 +53,6 @@ module attributes {clift.module} {
   // CHECK: [[ACCESS:%[0-9]+]] = clift.access<indirect 1> [[ADDRESSOF1]]
   // CHECK: [[ADDRESSOF2:%[0-9]+]] = clift.addressof [[ACCESS]]
   // CHECK: [[CAST:%[0-9]+]] = clift.bitcast [[ADDRESSOF2]]
-  // CHECK: clift.yield [[CAST]] : !clift.ptr<8 to !int32_t>
+  // CHECK: [[DISCARD:%[0-9]+]] = clift.discard [[CAST]] : !clift.ptr<8 to !int32_t>
+  // CHECK: clift.yield [[DISCARD]] : !void
 }

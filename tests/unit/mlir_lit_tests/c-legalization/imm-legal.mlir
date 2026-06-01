@@ -23,29 +23,37 @@ module attributes {clift.module} {
     clift.expr {
       // CHECK: %0 = clift.imm 42 : !int32_t
       %0 = clift.imm 42 : !int32_t
-      // CHECK: clift.yield %0 : !int32_t
-      clift.yield %0 : !int32_t
+      // CHECK: %1 = clift.discard %0 : !int32_t
+      %1 = clift.discard %0 : !int32_t
+      // CHECK: clift.yield %1 : !void
+      clift.yield %1 : !void
     }
 
     clift.expr {
       // CHECK: %0 = clift.imm 42 : !uint32_t
       %0 = clift.imm 42 : !uint32_t
-      // CHECK: clift.yield %0 : !uint32_t
-      clift.yield %0 : !uint32_t
+      // CHECK: %1 = clift.discard %0 : !uint32_t
+      %1 = clift.discard %0 : !uint32_t
+      // CHECK: clift.yield %1 : !void
+      clift.yield %1 : !void
     }
 
     clift.expr {
       // CHECK: %0 = clift.imm 42 : !int64_t
       %0 = clift.imm 42 : !int64_t
-      // CHECK: clift.yield %0 : !int64_t
-      clift.yield %0 : !int64_t
+      // CHECK: %1 = clift.discard %0 : !int64_t
+      %1 = clift.discard %0 : !int64_t
+      // CHECK: clift.yield %1 : !void
+      clift.yield %1 : !void
     }
 
     clift.expr {
       // CHECK: %0 = clift.imm 42 : !uint64_t
       %0 = clift.imm 42 : !uint64_t
-      // CHECK: clift.yield %0 : !uint64_t
-      clift.yield %0 : !uint64_t
+      // CHECK: %1 = clift.discard %0 : !uint64_t
+      %1 = clift.discard %0 : !uint64_t
+      // CHECK: clift.yield %1 : !void
+      clift.yield %1 : !void
     }
   }
 }

@@ -102,21 +102,22 @@ def RedundantBitCastPattern
         (replaceWithValue $arg),
         [(TypesAreEquivalent $res, $arg)]>;
 
-// *(T*)p = x ->         *p = (T)x
-//            -> *(T*)&( *p = (T)x )
-// Note: The choice of replacement depends on whether the result is discarded.
+// discard(x) -> x
+// Constraint: the type of x is void.
+def RedundantDiscardPattern
+  : Pat<(Clift_DiscardOp $arg),
+        (replaceWithValue $arg),
+        [(Constraint<CPred<[{ clift::unwrapped_isa<VoidType>($0.getType()) }]>> $arg)]>;
+
+// discard( *(T*)p = x ) -> discard( *p = (U)x )
 // Constraint: p is of type U* and x is convertible to type U using a bitcast.
 def AssignTypePunnedPattern
-  : Pattern<(Clift_AssignOp:$old_res (Clift_IndirectionOp:$old_ref (Clift_BitCastOp:$new_ptr $ptr)),
-                                     $value),
-            [(Clift_AssignOp:$new_res (Clift_IndirectionOp $ptr),
-                                      (Clift_BitCastOp $value,
-                                                       (returnType (getPointeeType $ptr)))),
-             (NativeCodeCall<"assignTypePunnedResult($_builder, $0, $1, $2, $3)"> $old_res,
-                                                                                  $new_res,
-                                                                                  $new_ptr,
-                                                                                  $old_ref)],
-            [(Constraint<CPred<"assignTypePunnedConstraint($0, $1)">> $ptr, $value)]>;
+  : Pat<(Clift_DiscardOp (Clift_AssignOp:$old_res (Clift_IndirectionOp:$old_ref (Clift_BitCastOp:$new_ptr $ptr)),
+                                                  $value)),
+        (Clift_DiscardOp (Clift_AssignOp:$new_res (Clift_IndirectionOp $ptr),
+                                                  (Clift_BitCastOp $value,
+                                                                   (returnType (getPointeeType $ptr))))),
+        [(Constraint<CPred<"assignTypePunnedConstraint($0, $1)">> $ptr, $value)]>;
 
 // (T*)(i + k_1) -> (T*)i + k_2
 // Note: k_2 = k_1 / sizeof(T)

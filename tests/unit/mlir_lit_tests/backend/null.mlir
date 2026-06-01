@@ -22,7 +22,8 @@ module attributes {clift.module} {
     clift.expr {
         %0 = clift.imm 0 : !int64_t
         %1 = clift.bitcast %0 : !int64_t -> !int64_t$ptr
-        clift.yield %1 : !int64_t$ptr
+        %2 = clift.discard %1 : !int64_t$ptr
+        clift.yield %2 : !void
     }
   }
   // CHECK: }

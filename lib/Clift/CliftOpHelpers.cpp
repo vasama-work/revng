@@ -17,10 +17,6 @@ static bool testValueUsage(mlir::Value Value) {
   return true;
 }
 
-bool clift::isDiscarded(mlir::Value Value) {
-  return testValueUsage<&ExpressionOpInterface::isDiscardedOperand>(Value);
-}
-
 bool clift::isBooleanTested(mlir::Value Value) {
   return testValueUsage<&ExpressionOpInterface::isBooleanTestedOperand>(Value);
 }

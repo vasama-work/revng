@@ -18,8 +18,10 @@ module attributes {clift.module} {
       // COM: 123456789 = 0x75BCD15
       // CHECK: %0 = clift.imm 123456789 : !int32_t
       %0 = clift.imm 123456789 : !int32_t
-      // CHECK: clift.yield %0 : !int32_t
-      clift.yield %0 : !int32_t
+      // CHECK: %1 = clift.discard %0 : !int32_t
+      %1 = clift.discard %0 : !int32_t
+      // CHECK: clift.yield %1 : !void
+      clift.yield %1 : !void
     // CHECK: }
     }
 
@@ -28,8 +30,10 @@ module attributes {clift.module} {
       // COM: 11185083 = 0xAAABBB
       // CHECK: %0 = clift.imm 11185083 {clift.radix = 16 : ui32} : !int32_t
       %0 = clift.imm 11185083 : !int32_t
-      // CHECK: clift.yield %0 : !int32_t
-      clift.yield %0 : !int32_t
+      // CHECK: %1 = clift.discard %0 : !int32_t
+      %1 = clift.discard %0 : !int32_t
+      // CHECK: clift.yield %1 : !void
+      clift.yield %1 : !void
     // CHECK: }
     }
 
@@ -41,8 +45,10 @@ module attributes {clift.module} {
       %1 = clift.imm 1000 : !int32_t
       // CHECK: %2 = clift.bitor %0, %1 : !int32_t
       %2 = clift.bitor %0, %1 : !int32_t
-      // CHECK: clift.yield %2 : !int32_t
-      clift.yield %2 : !int32_t
+      // CHECK: %3 = clift.discard %2 : !int32_t
+      %3 = clift.discard %2 : !int32_t
+      // CHECK: clift.yield %3 : !void
+      clift.yield %3 : !void
     // CHECK: }
     }
   }

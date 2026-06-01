@@ -18,7 +18,8 @@ module attributes {clift.module} {
     // CHECK: causes integer promotion in the target implementation
     clift.expr {
       %2 = clift.add %1, %1 : !int16_t
-      clift.yield %2 : !int16_t
+      %3 = clift.discard %2 : !int16_t
+      clift.yield %3 : !void
     }
   }
 }

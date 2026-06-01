@@ -21,8 +21,10 @@ module attributes {clift.module} {
       // CHECK: %1 = clift.ptr_resize %0 : !clift.ptr<4 to !int32_t> -> !clift.ptr<8 to !int32_t>
       %1 = clift.indirection %0 : !clift.ptr<4 to !int32_t>
       // CHECK: %2 = clift.indirection %1 : !clift.ptr<8 to !int32_t>
-      // CHECK: clift.yield %2 : !int32_t
-      clift.yield %1 : !int32_t
+      // CHECK: %3 = clift.discard %2 : !int32_t
+      %2 = clift.discard %1 : !int32_t
+      // CHECK: clift.yield %3 : !void
+      clift.yield %2 : !void
     }
   }
 }

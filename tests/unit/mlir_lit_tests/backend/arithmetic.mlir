@@ -46,7 +46,8 @@ module attributes {clift.module} {
       %d = clift.div %c, %4 : !int32_t
       %e = clift.rem %d, %5 : !int32_t
 
-      clift.yield %e : !int32_t
+      %r = clift.discard %e : !int32_t
+      clift.yield %r : !void
     }
 
     // 0 + (1 - 2) * (3 / (4 % 5)
@@ -64,7 +65,8 @@ module attributes {clift.module} {
       %c = clift.mul %b, %d : !int32_t
       %a = clift.add %0, %c : !int32_t
 
-      clift.yield %a : !int32_t
+      %r = clift.discard %e : !int32_t
+      clift.yield %r : !void
     }
 
     // 0 % 1 / 2 * 3 + 4 - 5;
@@ -82,7 +84,8 @@ module attributes {clift.module} {
       %d = clift.sub %c, %4 : !int32_t
       %e = clift.add %d, %5 : !int32_t
 
-      clift.yield %e : !int32_t
+      %r = clift.discard %e : !int32_t
+      clift.yield %r : !void
     }
 
     // CHECK: &var_0 + (&var_1 - &var_0);
@@ -92,7 +95,8 @@ module attributes {clift.module} {
       %2 = clift.ptr_diff %1, %0 : !int32_t$ptr -> !ptrdiff_t
       %4 = clift.addressof %v0 : !int32_t$ptr
       %3 = clift.ptr_add %4, %2 : (!int32_t$ptr, !ptrdiff_t)
-      clift.yield %3 : !int32_t$ptr
+      %5 = clift.discard %3 : !int32_t$ptr
+      clift.yield %5 : !void
     }
 
     // CHECK: &var_1 - (&var_1 - &var_0);
@@ -102,7 +106,8 @@ module attributes {clift.module} {
       %2 = clift.ptr_diff %1, %0 : !int32_t$ptr -> !ptrdiff_t
       %4 = clift.addressof %v1 : !int32_t$ptr
       %3 = clift.ptr_sub %4, %2 : (!int32_t$ptr, !ptrdiff_t)
-      clift.yield %3 : !int32_t$ptr
+      %5 = clift.discard %3 : !int32_t$ptr
+      clift.yield %5 : !void
     }
   }
   // CHECK: }

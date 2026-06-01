@@ -36,7 +36,8 @@ module attributes {clift.module} {
       %1 = clift.decay %0 : !clift.array<2 x !int32_t> -> !clift.ptr<8 to !int32_t>
       %2 = clift.imm 1 : !int32_t
       %3 = clift.subscript %1, %2 : (!clift.ptr<8 to !int32_t>, !int32_t)
-      clift.yield %3 : !int32_t
+      %4 = clift.discard %3 : !int32_t
+      clift.yield %4 : !void
     }
   }
   // CHECK: }

@@ -45,7 +45,8 @@ module attributes {clift.module} {
       %8 = clift.add %5, %7 : !generic64_t
       %9 = clift.add %3, %8 : !generic64_t
       %10 = clift.bitcast %9 : !generic64_t -> !int32_t$ptr
-      clift.yield %10 : !int32_t$ptr
+      %11 = clift.discard %10 : !int32_t$ptr
+      clift.yield %11 : !void
     }
   }
 
@@ -59,7 +60,8 @@ module attributes {clift.module} {
   // CHECK: [[DECAY2:%[0-9]+]] = clift.decay [[SUBSCRIPTION1]]
   // CHECK: [[SUBSCRIPTION2:%[0-9]+]] = clift.subscript [[DECAY2]], [[ARG1]]
   // CHECK: [[ADDRESSOF2:%[0-9]+]] = clift.addressof [[SUBSCRIPTION2]]
-  // CHECK: clift.yield [[ADDRESSOF2]] : !clift.ptr<8 to !int32_t>
+  // CHECK: [[DISCARD:%[0-9]+]] = clift.discard [[ADDRESSOF2]] : !clift.ptr<8 to !int32_t>
+  // CHECK: clift.yield [[DISCARD]] : !void
 
   // Same access pattern but with a `struct` wrapping the `inner array`.
   // This exercises the path through struct access + array subscript at each
@@ -80,7 +82,8 @@ module attributes {clift.module} {
       %8 = clift.add %5, %7 : !generic64_t
       %9 = clift.add %3, %8 : !generic64_t
       %10 = clift.bitcast %9 : !generic64_t -> !int32_t$ptr
-      clift.yield %10 : !int32_t$ptr
+      %11 = clift.discard %10 : !int32_t$ptr
+      clift.yield %11 : !void
     }
   }
 
@@ -95,5 +98,6 @@ module attributes {clift.module} {
   // CHECK: [[DECAY2:%[0-9]+]] = clift.decay [[ACCESS]]
   // CHECK: [[SUBSCRIPTION2:%[0-9]+]] = clift.subscript [[DECAY2]], [[ARG1]]
   // CHECK: [[ADDRESSOF2:%[0-9]+]] = clift.addressof [[SUBSCRIPTION2]]
-  // CHECK: clift.yield [[ADDRESSOF2]] : !clift.ptr<8 to !int32_t>
+  // CHECK: [[DISCARD:%[0-9]+]] = clift.discard [[ADDRESSOF2]] : !clift.ptr<8 to !int32_t>
+  // CHECK: clift.yield [[DISCARD]] : !void
 }

@@ -24,7 +24,8 @@ module attributes {clift.module} {
     // CHECK: seg_0x40002001;
     clift.expr {
       %y = clift.use @seg_0x40002001 : !int32_t
-      clift.yield %y : !int32_t
+      %d = clift.discard %y : !int32_t
+      clift.yield %d : !void
     }
   }
   // CHECK: }
